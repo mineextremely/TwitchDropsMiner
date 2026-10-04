@@ -1,0 +1,15 @@
+{
+	"luci-app-twitchdropsminer": {
+		"description": "Grant access to the Twitch Drops Miner",
+		"read": {
+			"uci": [ "twitchdropsminer" ],
+			"file": {
+				"/etc/init.d/twitchdropsminer": [ "exec" ],
+				"/tmp/twitchdropsminer.log": [ "read" ]
+			}
+		},
+		"write": {
+			"uci": [ "twitchdropsminer" ]
+		}
+	}
+}

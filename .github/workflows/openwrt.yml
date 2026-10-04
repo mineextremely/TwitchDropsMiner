@@ -1,0 +1,98 @@
+name: Build OpenWrt packages
+
+on:
+  push:
+    branches:
+      - openwrt
+    paths:
+      - 'twitch-drops-miner/**'
+      - 'luci-app-twitchdropsminer/**'
+      - 'headless.py'
+      - 'main.py'
+      - 'twitch.py'
+      - 'utils.py'
+      - 'constants.py'
+      - 'settings.py'
+      - 'translate.py'
+      - 'version.py'
+      - '.github/workflows/openwrt.yml'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (leave empty to only build)'
+        required: false
+        default: ''
+      text:
+        description: 'Release notes'
+        required: false
+        default: ''
+
+env:
+  TZ: UTC
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }}-${{ matrix.sdk }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          # the target device (RK3566) uses aarch64_generic
+          - aarch64_generic
+        sdk:
+          # 25.12.x uses apk; 24.10.x uses opkg (kept for completeness)
+          - 25.12.3
+          - 24.10.6
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Cache OpenWrt SDK
+        uses: actions/cache@v5
+        with:
+          path: /opt/openwrt-sdk-${{ matrix.arch }}-${{ matrix.sdk }}
+          key: sdk-${{ matrix.arch }}-${{ matrix.sdk }}
+
+      - name: Build packages
+        uses: openwrt/gh-action-sdk@main
+        env:
+          ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
+          FEEDNAME: twitchdropsminer
+          PACKAGES: twitch-drops-miner luci-app-twitchdropsminer
+          NO_REFRESH_CHECK: 1
+          NO_SHFMT_CHECK: 1
+          MAKEFLAGS: -j$(nproc)
+          V: s
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: packages-${{ matrix.arch }}-${{ matrix.sdk }}
+          path: bin/packages/${{ matrix.arch }}/twitchdropsminer/*
+
+  release:
+    name: Publish release
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.tag != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          name: ${{ github.event.inputs.tag }}
+          body: ${{ github.event.inputs.text }}
+          prerelease: true
+          files: artifacts/**/*

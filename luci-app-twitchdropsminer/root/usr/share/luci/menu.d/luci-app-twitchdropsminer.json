@@ -1,0 +1,31 @@
+{
+	"admin/services/twitchdropsminer": {
+		"title": "Twitch Drops Miner",
+		"order": 60,
+		"action": {
+			"type": "firstchild"
+		},
+		"depends": {
+			"acl": [ "luci-app-twitchdropsminer" ],
+			"uci": { "twitchdropsminer": true }
+		}
+	},
+
+	"admin/services/twitchdropsminer/overview": {
+		"title": "Overview",
+		"order": 1,
+		"action": {
+			"type": "view",
+			"path": "twitchdropsminer/overview"
+		}
+	},
+
+	"admin/services/twitchdropsminer/config": {
+		"title": "Settings",
+		"order": 2,
+		"action": {
+			"type": "view",
+			"path": "twitchdropsminer/config"
+		}
+	}
+}

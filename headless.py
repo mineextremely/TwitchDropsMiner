@@ -260,6 +260,8 @@ class HeadlessUI:
         pass
 
     def print(self, message: str) -> None:
+        # log the message, so that it ends up in the log file too (if --log is used)
+        logger.info(message)
         # print to stdout, which is captured by the service supervisor
         stamp = datetime.now().strftime("%X")
         if '\n' in message:

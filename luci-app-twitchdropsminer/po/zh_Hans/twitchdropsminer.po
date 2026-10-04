@@ -1,0 +1,137 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: luci-app-twitchdropsminer\n"
+"Report-Msgid-Bugs-To: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: zh_Hans\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "Twitch Drops Miner"
+msgstr "Twitch 掉宝挖矿器"
+
+# overview
+msgid "Service status:"
+msgstr "服务状态："
+
+msgid "Running"
+msgstr "运行中"
+
+msgid "Stopped"
+msgstr "已停止"
+
+msgid "Checking..."
+msgstr "检查中…"
+
+msgid "Start"
+msgstr "启动"
+
+msgid "Stop"
+msgstr "停止"
+
+msgid "Restart"
+msgstr "重启"
+
+msgid "Log"
+msgstr "日志"
+
+msgid "Loading..."
+msgstr "加载中…"
+
+msgid "No log available yet."
+msgstr "暂无日志。"
+
+msgid "(empty)"
+msgstr "（空）"
+
+msgid ""
+"The miner signs in with the cookies.jar file in its data directory. Copy it "
+"there from a machine where you completed the Twitch login."
+msgstr ""
+"挖矿器使用数据目录中的 cookies.jar 登录。请先在已完成 Twitch 登录的电脑上"
+"取得该文件，再复制到数据目录。"
+
+# config
+msgid ""
+"Configuration of the Twitch Drops Miner service. Saving applies the settings "
+"and restarts the miner."
+msgstr "Twitch 掉宝挖矿器的配置。保存后会应用设置并重启挖矿器。"
+
+msgid "Enable"
+msgstr "启用"
+
+msgid "Start the miner together with the system."
+msgstr "随系统启动挖矿器。"
+
+msgid "Data directory"
+msgstr "数据目录"
+
+msgid "Directory for cookies.jar, settings and logs."
+msgstr "存放 cookies.jar、设置与日志的目录。"
+
+msgid "Log level"
+msgstr "日志级别"
+
+msgid "Error"
+msgstr "错误"
+
+msgid "Warning"
+msgstr "警告"
+
+msgid "Info"
+msgstr "信息"
+
+msgid "Debug (calls)"
+msgstr "调试（调用）"
+
+msgid "Debug (everything)"
+msgstr "调试（全部）"
+
+msgid "Connection quality"
+msgstr "网络质量"
+
+msgid "1 = best connection, 6 = worst. Affects request timeouts."
+msgstr "1 = 网络最好，6 = 最差。影响请求超时时间。"
+
+msgid "Priority mode"
+msgstr "优先级模式"
+
+msgid "What to mine when none of the priority games are available."
+msgstr "当优先列表中的游戏都不可挖时，挖什么。"
+
+msgid "Priority list only"
+msgstr "仅优先列表"
+
+msgid "Ending soonest"
+msgstr "最先结束的活动"
+
+msgid "Low availability first"
+msgstr "可挖时间最少优先"
+
+msgid "Available drops check"
+msgstr "可掉落检查"
+
+msgid "Check if drops can be earned on a channel before switching to it (slower)."
+msgstr "切换频道前先检查该频道是否可赚取掉落（较慢）。"
+
+msgid "Proxy"
+msgstr "代理"
+
+msgid "HTTP proxy URL, e.g. http://192.168.1.2:7890"
+msgstr "HTTP 代理地址，例如 http://192.168.1.2:7890"
+
+msgid "Priority list"
+msgstr "优先列表"
+
+msgid "Games to mine first, in order of importance."
+msgstr "优先挖宝的游戏，按重要性排序。"
+
+msgid "Excluded games"
+msgstr "排除的游戏"
+
+msgid "Games to never mine."
+msgstr "永不挖宝的游戏。"
+
+msgid "Game name"
+msgstr "游戏名称"
