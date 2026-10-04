@@ -16,7 +16,6 @@ import aiohttp
 from yarl import URL
 
 from translate import _
-from gui import GUIManager
 from channel import Channel
 from websocket import WebsocketPool
 from inventory import DropsCampaign
@@ -56,7 +55,7 @@ from constants import (
 
 if TYPE_CHECKING:
     from utils import Game
-    from gui import LoginForm
+    from gui import LoginForm, GUIManager
     from channel import Stream
     from settings import Settings
     from inventory import TimedDrop
@@ -152,6 +151,15 @@ class _AuthState:
                     #     "verification_uri": "https://www.twitch.tv/activate?device-code=ABCDEFGH"
                     # }
                     response_json: JsonType = await response.json()
+                    if "device_code" not in response_json:
+                        # NOTE: the device code flow is currently not available for the
+                        # client we're using (Twitch has started rejecting it) - see
+                        # upstream issue #1165
+                        raise LoginException(
+                            "Device code login is not available: "
+                            f"{response_json.get('message', response_json)} - "
+                            "provide a valid cookies.jar instead"
+                        )
                     device_code: str = response_json["device_code"]
                     user_code: str = response_json["user_code"]
                     interval: int = response_json["interval"]
@@ -431,7 +439,11 @@ class _AuthState:
 
 
 class Twitch:
-    def __init__(self, settings: Settings):
+    def __init__(
+        self,
+        settings: Settings,
+        ui_factory: abc.Callable[[Twitch], GUIManager] | None = None,
+    ):
         self.settings: Settings = settings
         # State management
         self._state: State = State.IDLE
@@ -448,8 +460,11 @@ class Twitch:
         self._client_type: ClientInfo = ClientType.ANDROID_APP
         self._session: aiohttp.ClientSession | None = None
         self._auth_state: _AuthState = _AuthState(self)
-        # GUI
-        self.gui = GUIManager(self)
+        # GUI (or a headless replacement, injected via `ui_factory`)
+        if ui_factory is None:
+            from gui import GUIManager
+            ui_factory = GUIManager
+        self.gui = ui_factory(self)
         # Storing and watching channels
         self.channels: OrderedDict[int, Channel] = OrderedDict()
         self.watching_channel: AwaitableValue[Channel] = AwaitableValue()

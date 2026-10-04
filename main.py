@@ -15,25 +15,40 @@ if __name__ == "__main__":
     import argparse
     import warnings
     import traceback
-    import tkinter as tk
-    from tkinter import messagebox
     from typing import NoReturn, TYPE_CHECKING
 
-    import truststore
-    truststore.inject_into_ssl()
+    try:
+        import truststore
+    except ImportError:
+        # not available (e.g. on OpenWrt) - fall back to the default SSL context,
+        # which uses the system certificate store anyway
+        pass
+    else:
+        truststore.inject_into_ssl()
 
     from translate import _
     from twitch import Twitch
+    from headless import HeadlessUI
     from settings import Settings
     from version import __version__
     from exceptions import CaptchaRequired
     from utils import lock_file, resource_path, set_root_icon
-    from constants import LOGGING_LEVELS, SELF_PATH, FILE_FORMATTER, LOG_PATH, LOCK_PATH
+    from constants import (
+        DATA_DIR,
+        LOGGING_LEVELS,
+        SELF_PATH,
+        FILE_FORMATTER,
+        LOG_PATH,
+        LOCK_PATH,
+    )
 
     if TYPE_CHECKING:
         from _typeshed import SupportsWrite
 
     warnings.simplefilter("default", ResourceWarning)
+
+    # headless mode is detected early, since it affects how the parser reports errors
+    headless: bool = "--headless" in sys.argv[1:]
 
     # import tracemalloc
     # tracemalloc.start(3)
@@ -59,7 +74,13 @@ if __name__ == "__main__":
             try:
                 super().exit(status, message)  # sys.exit(2)
             finally:
-                messagebox.showerror("Argument Parser Error", self._message.getvalue())
+                if headless:
+                    stream = sys.stdout if status == 0 else sys.stderr
+                    stream.write(self._message.getvalue())
+                    stream.flush()
+                else:
+                    from tkinter import messagebox
+                    messagebox.showerror("Argument Parser Error", self._message.getvalue())
 
     class ParsedArgs(argparse.Namespace):
         _verbose: int
@@ -68,6 +89,7 @@ if __name__ == "__main__":
         log: bool
         tray: bool
         dump: bool
+        headless: bool
 
         # TODO: replace int with union of literal values once typeshed updates
         @property
@@ -96,13 +118,17 @@ if __name__ == "__main__":
             return logging.NOTSET
 
     # handle input parameters
-    # NOTE: parser output is shown via message box
-    # we also need a dummy invisible window for the parser
-    root = tk.Tk()
-    root.overrideredirect(True)
-    root.withdraw()
-    set_root_icon(root, resource_path("icons/pickaxe.ico"))
-    root.update()
+    # NOTE: parser output is shown via message box in GUI mode,
+    # and printed to the console in headless mode
+    # we also need a dummy invisible window for the parser (GUI mode only)
+    if not headless:
+        import tkinter as tk
+
+        root = tk.Tk()
+        root.overrideredirect(True)
+        root.withdraw()
+        set_root_icon(root, resource_path("icons/pickaxe.ico"))
+        root.update()
     parser = Parser(
         SELF_PATH.name,
         description="A program that allows you to mine timed drops on Twitch.",
@@ -112,6 +138,7 @@ if __name__ == "__main__":
     parser.add_argument("--tray", action="store_true")
     parser.add_argument("--log", action="store_true")
     parser.add_argument("--dump", action="store_true")
+    parser.add_argument("--headless", action="store_true")
     # undocumented debug args
     parser.add_argument(
         "--debug-ws", dest="_debug_ws", action="store_true", help=argparse.SUPPRESS
@@ -124,15 +151,20 @@ if __name__ == "__main__":
     try:
         settings = Settings(args)
     except Exception:
-        messagebox.showerror(
-            "Settings error",
+        error_message = (
             f"There was an error while loading the settings file:\n\n{traceback.format_exc()}"
         )
+        if headless:
+            sys.stderr.write(error_message + "\n")
+        else:
+            from tkinter import messagebox
+            messagebox.showerror("Settings error", error_message)
         sys.exit(4)
-    # dummy window isn't needed anymore
-    root.destroy()
-    # get rid of unneeded objects
-    del root, parser
+    if not headless:
+        # dummy window isn't needed anymore
+        root.destroy()
+        # get rid of unneeded objects
+        del root, parser
 
     # client run
     async def main():
@@ -158,7 +190,7 @@ if __name__ == "__main__":
         logging.getLogger("TwitchDrops.websocket").setLevel(settings.debug_ws)
 
         exit_status = 0
-        client = Twitch(settings)
+        client = Twitch(settings, HeadlessUI if settings.headless else None)
         loop = asyncio.get_running_loop()
         if sys.platform == "linux":
             loop.add_signal_handler(signal.SIGINT, lambda *_: client.gui.close())
@@ -187,6 +219,9 @@ if __name__ == "__main__":
             client.gui.status.update(_("gui", "status", "terminated"))
             # notify the user about the closure
             client.gui.grab_attention(sound=True)
+            if settings.headless:
+                # there's no window to keep open - request the closure right away
+                client.gui.close()
         await client.gui.wait_until_closed()
         # save the application state
         # NOTE: we have to do it after wait_until_closed,
@@ -195,6 +230,9 @@ if __name__ == "__main__":
         client.gui.stop()
         client.gui.close_window()
         sys.exit(exit_status)
+
+    # ensure the persistent data directory exists (may be overridden via TDM_DATA_DIR)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     try:
         # use lock_file to check if we're not already running

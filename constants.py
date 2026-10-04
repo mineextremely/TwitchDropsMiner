@@ -92,6 +92,12 @@ else:
     if SELF_PATH.stem == "pyinstaller" or SELF_PATH.name == "gui.py":
         SELF_PATH = Path(__file__).with_name("main.py").resolve()
 WORKING_DIR = SELF_PATH.parent
+# Persistent data directory - can be overridden via the TDM_DATA_DIR environment
+# variable, for systems where the working directory is not writable (e.g. OpenWrt)
+if _data_dir := os.environ.get("TDM_DATA_DIR"):
+    DATA_DIR = Path(_data_dir).expanduser().resolve()
+else:
+    DATA_DIR = WORKING_DIR
 # Development paths
 VENV_PATH = Path(WORKING_DIR, "env")
 SITE_PACKAGES_PATH = Path(VENV_PATH, SYS_SITE_PACKAGES)
@@ -100,13 +106,13 @@ SCRIPTS_PATH = Path(VENV_PATH, SYS_SCRIPTS)
 # NOTE: These don't have to be available to the end-user, so the path points to the internal dir
 LANG_PATH = _resource_path("lang")
 # Other Paths
-LOG_PATH = Path(WORKING_DIR, "log.txt")
-DUMP_PATH = Path(WORKING_DIR, "dump.dat")
-LOCK_PATH = Path(WORKING_DIR, "lock.file")
-CACHE_PATH = Path(WORKING_DIR, "cache")
+LOG_PATH = Path(DATA_DIR, "log.txt")
+DUMP_PATH = Path(DATA_DIR, "dump.dat")
+LOCK_PATH = Path(DATA_DIR, "lock.file")
+CACHE_PATH = Path(DATA_DIR, "cache")
 CACHE_DB = Path(CACHE_PATH, "mapping.json")
-COOKIES_PATH = Path(WORKING_DIR, "cookies.jar")
-SETTINGS_PATH = Path(WORKING_DIR, "settings.json")
+COOKIES_PATH = Path(DATA_DIR, "cookies.jar")
+SETTINGS_PATH = Path(DATA_DIR, "settings.json")
 # Typing
 JsonType = Dict[str, Any]
 URLType = NewType("URLType", str)

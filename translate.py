@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections import abc
 from typing import Any, TypedDict, TYPE_CHECKING
 
@@ -455,7 +456,8 @@ class Translator:
         # start with (and always copy) the default translation
         self._translation: Translation = default_translation.copy()
         # if we're in dev, update the template English.json file
-        if not IS_PACKAGED:
+        # (skipped if the language directory is read-only, e.g. on OpenWrt)
+        if not IS_PACKAGED and os.access(LANG_PATH, os.W_OK):
             default_langpath = LANG_PATH.joinpath(f"{DEFAULT_LANG}.json")
             json_save(default_langpath, default_translation)
         self._translation["language_name"] = DEFAULT_LANG
