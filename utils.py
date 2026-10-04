@@ -10,7 +10,6 @@ import string
 import asyncio
 import logging
 import traceback
-import webbrowser
 from enum import Enum
 from pathlib import Path
 from functools import wraps
@@ -278,6 +277,13 @@ def json_save(path: Path, contents: Mapping[Any, Any], *, sort: bool = False) ->
 
 def webopen(url: URL | str):
     url_str = str(url)
+    try:
+        # NOTE: imported lazily, as the module is not available on some systems
+        # (e.g. OpenWrt doesn't package it at all)
+        import webbrowser
+    except ImportError:
+        # there's nothing we can do about not being able to open a browser
+        return
     if IS_PACKAGED and sys.platform == "linux":
         # https://pyinstaller.org/en/stable/
         # runtime-information.html#ld-library-path-libpath-considerations
