@@ -11,7 +11,6 @@ import asyncio
 import logging
 import traceback
 import webbrowser
-import tkinter as tk
 from enum import Enum
 from pathlib import Path
 from functools import wraps
@@ -19,15 +18,16 @@ from contextlib import suppress
 from functools import cached_property
 from datetime import datetime, timezone
 from collections import abc, OrderedDict
-from typing import Any, Literal, Callable, Generic, Mapping, TypeVar, ParamSpec, cast
+from typing import Any, Literal, Callable, Generic, Mapping, TypeVar, ParamSpec, cast, TYPE_CHECKING
 
 from yarl import URL
-from PIL.ImageTk import PhotoImage
-from PIL import Image as Image_module
 
 from exceptions import ExitRequest, ReloadRequest
 from constants import IS_PACKAGED, JsonType, PriorityMode
 from constants import _resource_path as resource_path  # noqa
+
+if TYPE_CHECKING:
+    import tkinter as tk
 
 
 _T = TypeVar("_T")  # type
@@ -38,6 +38,11 @@ logger = logging.getLogger("TwitchDrops")
 
 
 def set_root_icon(root: tk.Tk, image_path: Path | str) -> None:
+    # NOTE: Tkinter and Pillow are imported lazily here, so that importing
+    # this module doesn't require them (needed for headless operation)
+    from PIL import Image as Image_module
+    from PIL.ImageTk import PhotoImage
+
     with Image_module.open(image_path) as image:
         icon_photo = PhotoImage(master=root, image=image)
     root.iconphoto(True, icon_photo)  # type: ignore[arg-type]
