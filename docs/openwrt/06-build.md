@@ -36,6 +36,19 @@ ls bin/packages/aarch64_generic/twitchdropsminer/
 > 注：包的 `PKG_SOURCE` 指向本项目仓库的固定提交，SDK 需要能访问 GitHub；
 > vendored 轮子已经在仓库里（`twitch-drops-miner/files/wheels/`），不需要网络下载依赖。
 
+### ⚠️ 更新 PKG_SOURCE_VERSION 时必做
+
+`twitch-drops-miner` 使用 git 源，OpenWrt 会把 checkout 打成确定性 tarball 并校验
+`PKG_MIRROR_HASH`。升级固定提交后哈希会变，必须重新生成：
+
+```sh
+make package/twitch-drops-miner/check V=s   # 从 "set to <sha256>" 警告里取值
+```
+
+然后更新 `twitch-drops-miner/Makefile` 里的 `PKG_MIRROR_HASH`，否则构建会以
+`Package HASH check failed` 失败（实测 24.10.6 与 25.12.3 两个 SDK 产出的哈希一致，
+跨版本稳定）。
+
 ## 三包一览
 
 | 包 | 来源 | 内容 |
