@@ -4,7 +4,10 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=twitch-drops-miner
-PKG_VERSION:=16.dev
+# NOTE: upstream's version is "16.dev", which is not a valid apk version
+# (apk only allows numeric components plus a few suffixes), so it's mapped
+# to a pre-release of 16.0
+PKG_VERSION:=16.0_pre
 PKG_RELEASE:=1
 PKG_SOURCE_DATE:=2026-10-04
 
@@ -15,7 +18,7 @@ PKG_SOURCE_VERSION:=2cdf9f38723d3cc0af9ee35f29d5329ed0f2ef31
 # NOTE: regenerate when bumping PKG_SOURCE_VERSION -
 # run `make package/twitch-drops-miner/check V=s` and copy the hash from the
 # "PKG_MIRROR_HASH uses deprecated hash, set to ..." warning
-PKG_MIRROR_HASH:=bf76ee81d03bedd074b666c43a841594af8ed69329984bd642b665fff6c18db8
+PKG_MIRROR_HASH:=18582085c46e32fc1544b7d7d3fa09863bb4f296492d92cde3a6e4527d0ea5be
 
 PKG_MAINTAINER:=mineextremely
 PKG_LICENSE:=GPL-3.0-only
@@ -53,6 +56,12 @@ define Package/twitch-drops-miner/install
 	$(INSTALL_CONF) ./files/twitchdropsminer.config $(1)/etc/config/twitchdropsminer
 	$(foreach wheel,$(wildcard ./files/wheels/*.whl), \
 		$(STAGING_DIR_HOST)/bin/unzip -o $(wheel) -d $(1)/usr/lib/twitchdropsminer/deps >/dev/null;)
+	# The vendored musllinux wheels reference musl's libc soname
+	# (libc.musl-aarch64.so.1), which the OpenWrt dependency scanner does not
+	# know about. The symbols are resolved by the already-loaded libc at
+	# runtime, so the reference is dropped to satisfy the package check.
+	find $(1)/usr/lib/twitchdropsminer/deps -type f -name '*.so' | \
+		xargs -r $(STAGING_DIR_HOST)/bin/patchelf --remove-needed libc.musl-aarch64.so.1
 endef
 
 $(eval $(call BuildPackage,twitch-drops-miner))

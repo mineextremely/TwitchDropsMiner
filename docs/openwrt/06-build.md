@@ -36,6 +36,14 @@ ls bin/packages/aarch64_generic/twitchdropsminer/
 > 注：包的 `PKG_SOURCE` 指向本项目仓库的固定提交，SDK 需要能访问 GitHub；
 > vendored 轮子已经在仓库里（`twitch-drops-miner/files/wheels/`），不需要网络下载依赖。
 
+## 打包时踩过的坑（已修复，勿回退）
+
+1. **`PKG_MIRROR_HASH` 必须是真实哈希**（不能写 `skip`）：OpenWrt 会把 git checkout 打成确定性 tarball 并校验；写 `skip` 会在 check 阶段报 `Package HASH check failed`。
+2. **apk 版本号格式有约束**：`16.dev`（上游 version.py 的值）不是合法 apk 版本（点号后必须跟数字），会报
+   `ERROR: info field 'version' has invalid value`。已映射为 `16.0_pre`。合法后缀实测：`_pre`/`_git`/`_beta1`/`-rN`；非法：`_dev`、`~dev`。
+3. **vendored 轮子的 `libc.musl-aarch64.so.1` 依赖**：musllinux 轮子的 `.so` 带这个 soname，OpenWrt 的依赖扫描器不认识 → `Package twitch-drops-miner is missing dependencies`。
+   已在安装步骤用 SDK 自带的 `patchelf --remove-needed` 去掉（运行时符号由已加载的 libc 解析，实测正常）。
+
 ### ⚠️ 更新 PKG_SOURCE_VERSION 时必做
 
 `twitch-drops-miner` 使用 git 源，OpenWrt 会把 checkout 打成确定性 tarball 并校验

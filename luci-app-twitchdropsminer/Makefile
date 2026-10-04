@@ -14,7 +14,7 @@ PKG_LICENSE:=Apache-2.0
 PKG_MAINTAINER:=mineextremely
 
 LUCI_TITLE:=LuCI support for the Twitch Drops Miner
-LUCI_DEPENDS:=+twitch-drops-miner
+LUCI_DEPENDS:=+luci-base +twitch-drops-miner
 LUCI_PKGARCH:=all
 
 include $(TOPDIR)/feeds/luci/luci.mk
