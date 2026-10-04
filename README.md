@@ -1,5 +1,25 @@
 # Twitch Drops Miner
 
+> ### ⚠️ This is the `openwrt` branch of a fork
+>
+> This branch adds a **headless mode** and **OpenWrt / LuCI packaging** on top of the
+> original application, so that it can run 24/7 on a router — no display server, no
+> Tkinter, no desktop session. The `master` branch tracks
+> [the upstream project](https://github.com/DevilXD/TwitchDropsMiner) unchanged.
+>
+> - 📦 Packages: `twitch-drops-miner`, `luci-app-twitchdropsminer`,
+>   `luci-i18n-twitchdropsminer-zh-cn` (apk for 25.12+, ipk for 24.10)
+> - 🖥️ Managed from LuCI: service control, live mining status, current drop progress,
+>   channel list, logs, settings, and cookie file uploads
+> - 🔑 **Sign-in currently requires uploading a `cookies.jar`** — Twitch has disabled the
+>   device code login flow the app used (upstream
+>   [#1165](https://github.com/DevilXD/TwitchDropsMiner/issues/1165))
+>
+> **→ [OpenWrt port documentation](docs/openwrt/README.md)**
+>
+> Note: running on a router is explicitly *not* a supported use case of the upstream
+> project — that is exactly what this branch exists for.
+
 This application allows you to AFK mine timed Twitch drops, without having to worry about switching channels when the one you were watching goes offline, claiming the drops, or even receiving the stream data itself. This helps you save on bandwidth and hassle.
 
 ### How It Works:
