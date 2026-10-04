@@ -5,11 +5,16 @@
 			"uci": [ "twitchdropsminer" ],
 			"file": {
 				"/etc/init.d/twitchdropsminer": [ "exec" ],
-				"/tmp/twitchdropsminer.log": [ "read" ]
+				"/usr/bin/tdm-import": [ "exec" ],
+				"/tmp/twitchdropsminer.log": [ "read" ],
+				"/tmp/twitchdropsminer.status.json": [ "read" ]
 			}
 		},
 		"write": {
-			"uci": [ "twitchdropsminer" ]
+			"uci": [ "twitchdropsminer" ],
+			"file": {
+				"/tmp/twitchdropsminer-upload.bin": [ "write" ]
+			}
 		}
 	}
 }

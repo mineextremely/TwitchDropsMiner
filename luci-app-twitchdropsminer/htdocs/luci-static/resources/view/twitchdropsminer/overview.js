@@ -4,6 +4,22 @@
 'require poll';
 'require ui';
 
+var STATUS_FILE = '/tmp/twitchdropsminer.status.json';
+var LOG_FILE = '/tmp/twitchdropsminer.log';
+
+function readStatus() {
+	return fs.read(STATUS_FILE).then(function(data) {
+		try {
+			return JSON.parse(data);
+		}
+		catch (e) {
+			return null;
+		}
+	}).catch(function() {
+		return null;
+	});
+}
+
 return view.extend({
 	load: function() {
 		return Promise.resolve();
@@ -12,11 +28,14 @@ return view.extend({
 	render: function() {
 		var self = this;
 		var statusEl = E('span', { 'class': 'label' }, _('Checking...'));
+		var infoEl = E('div', {}, '-');
+		var progressEl = E('div', {}, '-');
+		var channelsEl = E('div', {}, '-');
 		var logEl = E('pre', {
 			'style': 'max-height: 25em; overflow: auto; white-space: pre-wrap; margin: 0;'
 		}, _('Loading...'));
 
-		function refreshStatus() {
+		function refreshServiceStatus() {
 			return fs.exec('/etc/init.d/twitchdropsminer', [ 'status' ]).then(function(res) {
 				var running = (res.code === 0);
 
@@ -29,7 +48,7 @@ return view.extend({
 		}
 
 		function refreshLog() {
-			return fs.read('/tmp/twitchdropsminer.log').then(function(data) {
+			return fs.read(LOG_FILE).then(function(data) {
 				var lines = (data || '').trim().split('\n');
 
 				logEl.textContent = lines.slice(-200).join('\n') || _('(empty)');
@@ -39,15 +58,117 @@ return view.extend({
 			});
 		}
 
+		function replace(node, children) {
+			while (node.firstChild)
+				node.removeChild(node.firstChild);
+			for (var i = 0; i < children.length; i++)
+				node.appendChild(children[i]);
+		}
+
+		function renderInfo(st) {
+			if (st == null)
+				return [ E('p', {}, _('No status available yet - the miner is not running.')) ];
+			var auth = st.auth || {};
+
+			var children = [
+				E('p', {}, [
+					_('State:'), ' ', E('strong', {}, st.state || '-'),
+					(st.status ? [ ' • ', st.status ] : '')
+				]),
+				E('p', {}, [
+					_('Login:'), ' ',
+					auth.logged_in
+						? _('Logged in (user %d)').format(auth.user_id)
+						: _('Not logged in')
+				])
+			];
+			if (auth.device_code)
+				children.push(E('p', {}, [
+					_('Device code:'), ' ', E('strong', {}, auth.device_code.user_code), ' — ',
+					E('a', { 'href': auth.device_code.verification_uri, 'target': '_blank' },
+						auth.device_code.verification_uri)
+				]));
+
+			return children;
+		}
+
+		function renderProgress(st) {
+			var p = st && st.progress;
+
+			if (!p)
+				return [ E('p', {}, _('Not mining at the moment.')) ];
+
+			var drop = p.drop, campaign = p.campaign, pct = Math.round((drop.progress || 0) * 100);
+
+			return [
+				E('p', {}, [ E('strong', {}, campaign.game || '?'), ' — ', campaign.name ]),
+				E('p', {}, [ _('Drop:'), ' ', drop.name || '-',
+					(drop.rewards && drop.rewards.length ? ' (' + drop.rewards.join(', ') + ')' : '') ]),
+				E('div', { 'class': 'cbi-progressbar', 'title': '%d%%'.format(pct) },
+					E('div', { 'style': 'width:%d%%'.format(pct) })),
+				E('p', {}, [
+					'%d/%d'.format(drop.current_minutes, drop.required_minutes), ' ',
+					_('minutes watched'), ' • ',
+					_('%d min remaining').format(drop.remaining_minutes)
+				]),
+				E('p', {}, [
+					_('Campaign:'), ' ',
+					_('%d/%d drops claimed').format(campaign.claimed_drops, campaign.total_drops),
+					' • ', '%d%%'.format(Math.round((campaign.progress || 0) * 100))
+				])
+			];
+		}
+
+		function renderChannels(st) {
+			var channels = (st && st.channels) || [];
+
+			if (!channels.length)
+				return [ E('p', {}, _('No channels.')) ];
+
+			var rows = channels.map(function(ch) {
+				return E('tr', { 'class': 'tr' }, [
+					E('td', { 'class': 'td' }, [ ch.watching ? '▶ ' : '', ch.name ]),
+					E('td', { 'class': 'td' }, ch.game || '-'),
+					E('td', { 'class': 'td' }, ch.online ? _('Online') : (ch.pending ? _('Pending') : _('Offline'))),
+					E('td', { 'class': 'td' }, ch.viewers != null ? String(ch.viewers) : '-'),
+					E('td', { 'class': 'td' }, ch.drops_enabled ? '✔' : '✘'),
+					E('td', { 'class': 'td' }, ch.acl_based ? '✔' : '')
+				]);
+			});
+
+			var table = E('table', { 'class': 'table' }, [
+				E('tr', { 'class': 'tr table-titles' }, [
+					E('th', { 'class': 'th' }, _('Channel')),
+					E('th', { 'class': 'th' }, _('Game')),
+					E('th', { 'class': 'th' }, _('Status')),
+					E('th', { 'class': 'th' }, _('Viewers')),
+					E('th', { 'class': 'th' }, _('Drops')),
+					E('th', { 'class': 'th' }, _('ACL'))
+				])
+			].concat(rows));
+
+			return [ E('div', { 'style': 'max-height: 20em; overflow: auto;' }, [ table ]) ];
+		}
+
 		function serviceAction(action) {
 			return fs.exec('/etc/init.d/twitchdropsminer', [ action ]).then(function() {
-				return refreshStatus();
+				return refreshServiceStatus();
 			});
 		}
 
-		poll.add(function() {
-			return refreshStatus().then(refreshLog);
-		}, 5);
+		function refresh() {
+			return Promise.all([ refreshServiceStatus(), readStatus(), refreshLog() ])
+				.then(function(res) {
+					var st = res[1];
+
+					replace(infoEl, renderInfo(st));
+					replace(progressEl, renderProgress(st));
+					replace(channelsEl, renderChannels(st));
+				});
+		}
+
+		poll.add(refresh, 5);
+		refresh();
 
 		var view = E([], [
 			E('h2', {}, _('Twitch Drops Miner')),
@@ -68,16 +189,23 @@ return view.extend({
 					}, _('Restart'))
 				])
 			]),
-			E('div', { 'class': 'alert-message note' }, [
-				_('The miner signs in with the cookies.jar file in its data directory. ' +
-				  'Copy it there from a machine where you completed the Twitch login.')
+			E('div', { 'class': 'cbi-section' }, [
+				E('h3', {}, _('Status')),
+				infoEl
 			]),
-			E('h3', {}, _('Log')),
-			E('div', { 'class': 'cbi-section' }, [ logEl ])
+			E('div', { 'class': 'cbi-section' }, [
+				E('h3', {}, _('Current drop')),
+				progressEl
+			]),
+			E('div', { 'class': 'cbi-section' }, [
+				E('h3', {}, _('Channels')),
+				channelsEl
+			]),
+			E('div', { 'class': 'cbi-section' }, [
+				E('h3', {}, _('Log')),
+				logEl
+			])
 		]);
-
-		refreshStatus();
-		refreshLog();
 
 		return view;
 	},

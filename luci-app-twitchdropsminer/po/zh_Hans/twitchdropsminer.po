@@ -135,3 +135,111 @@ msgstr "永不挖宝的游戏。"
 
 msgid "Game name"
 msgstr "游戏名称"
+
+# overview (live status)
+msgid "Status"
+msgstr "状态"
+
+msgid "No status available yet - the miner is not running."
+msgstr "暂无状态——挖矿器未在运行。"
+
+msgid "State:"
+msgstr "运行状态："
+
+msgid "Login:"
+msgstr "登录："
+
+msgid "Logged in (user %d)"
+msgstr "已登录（用户 %d）"
+
+msgid "Not logged in"
+msgstr "未登录"
+
+msgid "Device code:"
+msgstr "设备码："
+
+msgid "Current drop"
+msgstr "当前掉落"
+
+msgid "Not mining at the moment."
+msgstr "当前未在挖宝。"
+
+msgid "Drop:"
+msgstr "掉落："
+
+msgid "minutes watched"
+msgstr "分钟已观看"
+
+msgid "%d min remaining"
+msgstr "剩余 %d 分钟"
+
+msgid "Campaign:"
+msgstr "活动："
+
+msgid "%d/%d drops claimed"
+msgstr "已领取 %d/%d 个掉落"
+
+msgid "Channels"
+msgstr "频道"
+
+msgid "No channels."
+msgstr "暂无频道。"
+
+msgid "Channel"
+msgstr "频道"
+
+msgid "Game"
+msgstr "游戏"
+
+msgid "Viewers"
+msgstr "观众"
+
+msgid "Drops"
+msgstr "掉落"
+
+msgid "ACL"
+msgstr "ACL"
+
+msgid "Online"
+msgstr "在线"
+
+msgid "Pending"
+msgstr "待确认"
+
+msgid "Offline"
+msgstr "离线"
+
+# login page
+msgid "Twitch Drops Miner - Login"
+msgstr "Twitch 掉宝挖矿器 - 登录"
+
+msgid "cookies.jar (required)"
+msgstr "cookies.jar（必需）"
+
+msgid ""
+"Twitch device code login is currently unavailable, so the miner signs in with "
+"a saved session. Log in with the miner on a PC, then upload the cookies.jar "
+"file from its directory here."
+msgstr ""
+"Twitch 的设备码登录目前不可用，挖矿器改为使用已保存的会话登录。请先在电脑上"
+"用挖矿器完成登录，然后把其目录中的 cookies.jar 上传到这里。"
+
+msgid "settings.json (optional)"
+msgstr "settings.json（可选）"
+
+msgid ""
+"Upload a settings.json exported from the miner to restore its settings. "
+"Note that the priority and exclude lists are normally configured on the "
+"Settings page."
+msgstr ""
+"上传从挖矿器导出的 settings.json 以恢复设置。注意：优先列表与排除列表通常"
+"在“设置”页面配置。"
+
+msgid "The miner is not running."
+msgstr "挖矿器未在运行。"
+
+msgid "%s has been imported. Restarting the miner..."
+msgstr "%s 已导入，正在重启挖矿器…"
+
+msgid "Import failed: %s"
+msgstr "导入失败：%s"

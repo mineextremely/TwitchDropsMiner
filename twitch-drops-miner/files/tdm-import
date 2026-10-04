@@ -1,0 +1,43 @@
+#!/bin/sh
+#
+# Import a file (cookies.jar or settings.json) into the miner's data directory.
+# Used by the LuCI interface, so that uploads work with any configured
+# data directory.
+#
+# usage: tdm-import <source-file> <cookies.jar|settings.json>
+#
+set -e
+
+src="$1"
+name="$2"
+
+if [ -z "$src" ] || [ -z "$name" ]; then
+	echo "usage: tdm-import <source-file> <cookies.jar|settings.json>" >&2
+	exit 1
+fi
+
+case "$name" in
+	cookies.jar|settings.json)
+		;;
+	*)
+		echo "unsupported file name: $name" >&2
+		exit 1
+		;;
+esac
+
+[ -f "$src" ] || {
+	echo "source file not found: $src" >&2
+	exit 1
+}
+
+# shellcheck source=/dev/null
+. /lib/functions.sh
+
+config_load twitchdropsminer
+config_get data_dir main data_dir "/etc/twitchdropsminer"
+
+mkdir -p "$data_dir"
+cp "$src" "$data_dir/$name"
+chmod 600 "$data_dir/$name"
+
+echo "imported $name into $data_dir"

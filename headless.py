@@ -6,18 +6,22 @@ so the miner can run on systems without a display server or Tkinter
 (e.g. an OpenWrt router). Selected with the `--headless` command line flag.
 
 The output is written to stdout, which makes it suitable for supervision
-by procd (OpenWrt), systemd, or a container runtime.
+by procd (OpenWrt), systemd, or a container runtime. A JSON status file is
+written periodically as well, which is what the LuCI interface reads.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+from time import time
 from collections import abc
 from datetime import datetime
 from typing import Any, TypeVar, TYPE_CHECKING
 
 from translate import _
 from exceptions import ExitRequest, LoginException
+from constants import STATUS_PATH
+from utils import json_save
 
 if TYPE_CHECKING:
     from twitch import Twitch
@@ -28,13 +32,18 @@ if TYPE_CHECKING:
 logger = logging.getLogger("TwitchDrops")
 
 _T = TypeVar("_T")
+# how often the status file is refreshed, in seconds
+STATUS_INTERVAL = 2
 
 
 class _Tray:
-    """Tray icon replacement - all operations are no-ops."""
+    """Tray icon replacement - records the icon state for status reporting."""
+
+    def __init__(self) -> None:
+        self.state: str = "pickaxe"
 
     def change_icon(self, state: str) -> None:
-        pass
+        self.state = state
 
     def notify(self, message: str, title: str | None = None, duration: float = 10) -> None:
         pass
@@ -60,11 +69,18 @@ class _Status:
 class _Websockets:
     """Websocket status panel replacement."""
 
+    def __init__(self) -> None:
+        self.items: dict[int, dict[str, Any]] = {}
+
     def update(self, idx: int, status: str | None = None, topics: int | None = None) -> None:
-        pass
+        item = self.items.setdefault(idx, {"status": None, "topics": 0})
+        if status is not None:
+            item["status"] = status
+        if topics is not None:
+            item["topics"] = topics
 
     def remove(self, idx: int) -> None:
-        pass
+        self.items.pop(idx, None)
 
 
 class _Progress:
@@ -76,8 +92,11 @@ class _Progress:
     fallback in the watch loop.
     """
 
+    def __init__(self) -> None:
+        self.drop: TimedDrop | None = None
+
     def display(self, drop: TimedDrop | None, *, countdown: bool = True, subone: bool = False) -> None:
-        pass
+        self.drop = drop
 
     def start_timer(self) -> None:
         pass
@@ -92,23 +111,27 @@ class _Progress:
 class _Channels:
     """Channel list replacement - there is no manual channel selection."""
 
+    def __init__(self) -> None:
+        self.items: dict[int, Channel] = {}
+        self.watching: Channel | None = None
+
     def get_selection(self) -> None:
         return None
 
     def clear(self) -> None:
-        pass
+        self.items.clear()
 
     def display(self, channel: Channel, *, add: bool = False) -> None:
-        pass
+        self.items[channel.id] = channel
 
     def remove(self, channel: Channel) -> None:
-        pass
+        self.items.pop(channel.id, None)
 
     def set_watching(self, channel: Channel) -> None:
-        pass
+        self.watching = channel
 
     def clear_watching(self) -> None:
-        pass
+        self.watching = None
 
 
 class _Inventory:
@@ -188,11 +211,15 @@ class HeadlessUI:
     websocket pool, channels and inventory objects. Purely cosmetic calls
     are no-ops; the behavioral parts (close handling, login, channel
     selection, progress timing) are implemented to match the GUI semantics.
+
+    A JSON snapshot of the current state is written to `STATUS_PATH`
+    periodically, which is what the LuCI interface displays.
     """
 
     def __init__(self, twitch: Twitch):
         self._twitch: Twitch = twitch
         self._close_requested = asyncio.Event()
+        self._status_task: asyncio.Task[None] | None = None
         # interface components
         self.tray = _Tray()
         self.status = _Status()
@@ -236,10 +263,14 @@ class HeadlessUI:
         return 0
 
     def start(self) -> None:
-        pass
+        if self._status_task is None:
+            self._status_task = asyncio.create_task(self._status_writer())
 
     def stop(self) -> None:
         self.progress.stop_timer()
+        if self._status_task is not None:
+            self._status_task.cancel()
+            self._status_task = None
 
     def close_window(self) -> None:
         pass
@@ -267,3 +298,88 @@ class HeadlessUI:
         if '\n' in message:
             message = message.replace('\n', f"\n{stamp}: ")
         print(f"{stamp}: {message}", flush=True)
+
+    # status reporting
+
+    async def _status_writer(self) -> None:
+        while True:
+            try:
+                json_save(STATUS_PATH, self._snapshot(), sort=True)
+            except Exception:
+                logger.debug("Failed to write the status file", exc_info=True)
+            await asyncio.sleep(STATUS_INTERVAL)
+
+    def _snapshot(self) -> dict[str, Any]:
+        twitch = self._twitch
+        auth_state = getattr(twitch, "_auth_state", None)
+        logged_in = getattr(auth_state, "_logged_in", None)
+
+        data: dict[str, Any] = {
+            "ts": round(time(), 3),
+            "state": getattr(getattr(twitch, "_state", None), "name", None),
+            "status": self.status.text,
+            "tray": self.tray.state,
+            "auth": {
+                "logged_in": bool(logged_in is not None and logged_in.is_set()),
+                "user_id": getattr(auth_state, "user_id", None),
+                "device_code": self.login.device_code,
+            },
+            "progress": self._drop_snapshot(),
+            "channels": self._channels_snapshot(),
+            "websockets": [
+                {
+                    "index": idx,
+                    "status": item.get("status"),
+                    "topics": item.get("topics", 0),
+                }
+                for idx, item in sorted(self.websockets.items.items())
+            ],
+        }
+        return data
+
+    def _drop_snapshot(self) -> dict[str, Any] | None:
+        drop = self.progress.drop
+        if drop is None:
+            return None
+        campaign = drop.campaign
+        game = getattr(campaign, "game", None)
+        return {
+            "drop": {
+                "id": getattr(drop, "id", None),
+                "name": drop.name,
+                "rewards": drop.rewards_text(),
+                "progress": round(drop.progress, 4),
+                "current_minutes": drop.current_minutes,
+                "required_minutes": drop.required_minutes,
+                "remaining_minutes": drop.remaining_minutes,
+                "is_claimed": drop.is_claimed,
+                "can_claim": drop.can_claim,
+            },
+            "campaign": {
+                "id": getattr(campaign, "id", None),
+                "name": campaign.name,
+                "game": game.name if game is not None else None,
+                "progress": round(campaign.progress, 4),
+                "claimed_drops": campaign.claimed_drops,
+                "total_drops": campaign.total_drops,
+                "remaining_minutes": campaign.remaining_minutes,
+            },
+        }
+
+    def _channels_snapshot(self) -> list[dict[str, Any]]:
+        channels = []
+        for channel in self.channels.items.values():
+            game = getattr(channel, "game", None)
+            channels.append({
+                "id": channel.id,
+                "name": channel.name,
+                "game": game.name if game is not None else None,
+                "viewers": getattr(channel, "viewers", None),
+                "online": channel.online,
+                "pending": channel.pending_online,
+                "drops_enabled": channel.drops_enabled,
+                "acl_based": channel.acl_based,
+                "watching": channel is self.channels.watching,
+            })
+        channels.sort(key=lambda item: (not item["watching"], -(item["viewers"] or 0)))
+        return channels

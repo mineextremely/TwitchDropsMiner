@@ -20,9 +20,18 @@
 		}
 	},
 
+	"admin/services/twitchdropsminer/login": {
+		"title": "Login",
+		"order": 2,
+		"action": {
+			"type": "view",
+			"path": "twitchdropsminer/login"
+		}
+	},
+
 	"admin/services/twitchdropsminer/config": {
 		"title": "Settings",
-		"order": 2,
+		"order": 3,
 		"action": {
 			"type": "view",
 			"path": "twitchdropsminer/config"
