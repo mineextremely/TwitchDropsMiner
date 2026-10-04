@@ -52,6 +52,8 @@ define Package/twitch-drops-miner/install
 	$(CP) $(PKG_BUILD_DIR)/lang $(1)/usr/lib/twitchdropsminer/
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/twitchdropsminer.init $(1)/etc/init.d/twitchdropsminer
+	$(INSTALL_DIR) $(1)/usr/bin
+	$(INSTALL_BIN) ./files/tdm-import $(1)/usr/bin/tdm-import
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./files/twitchdropsminer.config $(1)/etc/config/twitchdropsminer
 	$(foreach wheel,$(wildcard ./files/wheels/*.whl), \

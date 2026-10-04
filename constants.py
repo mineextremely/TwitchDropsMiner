@@ -107,6 +107,9 @@ SCRIPTS_PATH = Path(VENV_PATH, SYS_SCRIPTS)
 LANG_PATH = _resource_path("lang")
 # Other Paths
 LOG_PATH = Path(DATA_DIR, "log.txt")
+# Headless status file - written periodically by the headless UI and read by
+# the LuCI interface. NOTE: it lives in RAM by default, to avoid flash wear.
+STATUS_PATH = Path(os.environ.get("TDM_STATUS_FILE", "/tmp/twitchdropsminer.status.json"))
 DUMP_PATH = Path(DATA_DIR, "dump.dat")
 LOCK_PATH = Path(DATA_DIR, "lock.file")
 CACHE_PATH = Path(DATA_DIR, "cache")
