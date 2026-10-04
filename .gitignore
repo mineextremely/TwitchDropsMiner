@@ -18,6 +18,8 @@ log.txt
 /lock.file
 settings.json
 /lang/English.json
+# CI logs
+/GithubActionsLogs
 # AppImage
 /AppDir
 /appimage-builder
