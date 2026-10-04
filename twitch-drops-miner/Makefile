@@ -13,12 +13,12 @@ PKG_SOURCE_DATE:=2026-10-04
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/mineextremely/TwitchDropsMiner.git
-PKG_SOURCE_VERSION:=2cdf9f38723d3cc0af9ee35f29d5329ed0f2ef31
+PKG_SOURCE_VERSION:=f270afc3939b11f701b5e956a05a60203500e752
 # sha256 of the tarball the build system generates from the above commit
 # NOTE: regenerate when bumping PKG_SOURCE_VERSION -
 # run `make package/twitch-drops-miner/check V=s` and copy the hash from the
 # "PKG_MIRROR_HASH uses deprecated hash, set to ..." warning
-PKG_MIRROR_HASH:=18582085c46e32fc1544b7d7d3fa09863bb4f296492d92cde3a6e4527d0ea5be
+PKG_MIRROR_HASH:=18ac604e87b0ceaad9450c4bd2cb27f0d72c5cfa903cbcc9f7a8601bf99108ce
 
 PKG_MAINTAINER:=mineextremely
 PKG_LICENSE:=GPL-3.0-only
