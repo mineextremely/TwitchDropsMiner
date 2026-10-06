@@ -87,6 +87,13 @@ start_service() {
 	procd_close_instance
 }
 
+stop_service() {
+	# drop the runtime state, so LuCI doesn't keep showing stale mining data
+	# for a miner that isn't running anymore
+	rm -f /tmp/twitchdropsminer.status.json \
+		/tmp/twitchdropsminer.inventory.json
+}
+
 reload_service() {
 	stop
 	start

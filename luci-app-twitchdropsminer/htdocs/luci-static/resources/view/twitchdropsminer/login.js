@@ -7,6 +7,9 @@
 var STATUS_FILE = '/tmp/twitchdropsminer.status.json';
 var UPLOAD_FILE = '/tmp/twitchdropsminer-upload.bin';
 
+/* see overview.js - covers both the footstrap and the bootstrap label classes */
+var LABEL_BAD = 'label danger important';
+
 return view.extend({
 	load: function() {
 		return Promise.resolve();
@@ -31,7 +34,7 @@ return view.extend({
 						_('Login:'), ' ',
 						auth.logged_in
 							? E('span', { 'class': 'label success' }, _('Logged in (user %d)').format(auth.user_id))
-							: E('span', { 'class': 'label danger' }, _('Not logged in'))
+							: E('span', { 'class': LABEL_BAD }, _('Not logged in'))
 					])
 				];
 

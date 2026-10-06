@@ -138,3 +138,32 @@ config twitchdropsminer 'main'
 | M10 | 去掉 `--dump` 的 GUI 依赖或禁用 | `twitch.py:636-638,841-843` |
 
 M1–M3 是**跑起来的最小集**；M6–M7 是 LuCI 可用的前提；M9 是 7×24 稳定性的建议修复。
+
+## 5. 已实现的导出层（`headless.py`）
+
+> 第 1 节是移植前的草案；实际实现以本节为准。全部字段都是现有属性的 1:1 直取，没有为了显示新增计算。
+
+状态拆成**两个文件**，都落在 `/tmp`（tmpfs，975MB，不磨损 flash）：
+
+| 文件 | 写入时机 | 内容 |
+|---|---|---|
+| `/tmp/twitchdropsminer.status.json` | 每 `STATUS_INTERVAL`=2s | 状态机、状态栏文字、图标、登录、当前掉落 + 所在活动、频道列表、websocket |
+| `/tmp/twitchdropsminer.inventory.json` | 内容变化 **且**距上次写入 ≥ `INVENTORY_INTERVAL`=10s | 全部活动及其掉落的完整列表 |
+
+拆开的原因是体量差了两个数量级：实测该账号 **100 个活动 / 324 个掉落 / 370 个奖励**，
+全量列表用 `json_save()`（`indent=4`，为可手改的配置文件设计）序列化是 **494KB**，
+每 2s 重写一遍纯属浪费。因此：
+
+- `_write_json()` 用紧凑分隔符（`separators=(',', ':')`）原子写（`.new` + rename），不经过 `json_save()`；
+- `_Inventory` 在 `clear()/add_campaign()/update_drop()` 里打脏标记（`update_drop` 由掉落的分钟数变化驱动），
+  写入循环按 `INVENTORY_INTERVAL` 节流；
+- 只导出页面真正用到的字段，去掉 `link_url`、`linked`、`starts_at`、掉落 `id`、奖励 `type` 等。
+
+结果是 **494KB → 197KB**（-60%），写入频率从 0.5 次/秒降到 ≤0.1 次/秒。
+
+活动在导出时即排好序（正在挖的 → 未完成 → 未开始 → 其余），LuCI 侧不再重复排序，
+避免"顺序"在两处各定义一次。
+
+**未导出**的东西：`access_token`（永不外泄）、控制台环形缓冲（LuCI 直接读 `/tmp/twitchdropsminer.log`，
+不需要另一份）、`--dump` 相关内容。
+
