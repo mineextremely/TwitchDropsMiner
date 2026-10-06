@@ -20,6 +20,9 @@ settings.json
 /lang/English.json
 # CI logs
 /GithubActionsLogs
+# Local agent notes (CLAUDE.md is a symlink to AGENTS.md)
+/AGENTS.md
+/CLAUDE.md
 # AppImage
 /AppDir
 /appimage-builder
