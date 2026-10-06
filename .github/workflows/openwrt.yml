@@ -45,30 +45,85 @@ jobs:
           - aarch64_generic
         sdk:
           # 25.12.x uses apk; 24.10.x uses opkg (kept for completeness)
-          - 25.12.3
-          - 24.10.6
+          - 25.12.5
+          - 24.10.8
 
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Cache OpenWrt SDK
-        uses: actions/cache@v5
-        with:
-          path: /opt/openwrt-sdk-${{ matrix.arch }}-${{ matrix.sdk }}
-          key: sdk-${{ matrix.arch }}-${{ matrix.sdk }}
+      # NOTE: there used to be an `actions/cache` step here caching
+      # /opt/openwrt-sdk-<arch>-<sdk>. That path is never created by anything -
+      # gh-action-sdk unpacks the SDK *inside* the container image at /builder -
+      # so it always reported "Cache not found" (and "Path Validation Error" on
+      # save). It was removed rather than fixed: what makes the build slow lives
+      # inside an ephemeral container and cannot be cached from the host.
+
+      - name: Fetch the SDK container entrypoint
+        run: |
+          # We use gh-action-sdk only for its entrypoint.sh - the script that drives
+          # feeds update/install and the package build inside the container. We do
+          # not use the action itself, because its `docker run` is hardcoded and
+          # gives us no way to stop setup.sh from re-downloading the SDK.
+          git clone --depth 1 https://github.com/openwrt/gh-action-sdk "$RUNNER_TEMP/gh-action-sdk"
+          # Pinned for reproducibility; bump deliberately.
+          git -C "$RUNNER_TEMP/gh-action-sdk" checkout --quiet f5813d30eeef3534b58ac7e79c5d8842b6035434
+
+      - name: Write the entrypoint wrapper
+        run: |
+          cat > "$RUNNER_TEMP/entrypoint-wrapper.sh" <<'WRAPPER'
+          #!/bin/bash
+          # gh-action-sdk's entrypoint runs `[ ! -f setup.sh ] || bash setup.sh`
+          # with WORKDIR=/builder, so /builder/setup.sh - which downloads and
+          # extracts the official SDK tarball - always runs. Its own comment says
+          # snapshot images don't ship the SDK to save bandwidth; for a release
+          # image that download is pure waste, because the image already contains
+          # a complete SDK (cross toolchain + host tools).
+          #
+          # Only skip it when the SDK is demonstrably there, so this stays correct
+          # for any SDK variant that really does need the download (~5 min saved
+          # per build when it applies).
+          sdk_present=0
+          ls -d /builder/staging_dir/toolchain-* >/dev/null 2>&1 \
+            && [ -x /builder/staging_dir/host/bin/mkhash ] \
+            && sdk_present=1
+          if [ "$sdk_present" = 1 ]; then
+            echo "image already ships an SDK - neutralising setup.sh"
+            mv /builder/setup.sh /builder/setup.sh.disabled
+          else
+            echo "no SDK in the image - letting setup.sh download it"
+          fi
+          exec bash /entrypoint.sh
+          WRAPPER
+          chmod +x "$RUNNER_TEMP/entrypoint-wrapper.sh"
+          # the heredoc above is indented for readability; strip the leading spaces
+          sed -i 's/^          //' "$RUNNER_TEMP/entrypoint-wrapper.sh"
 
       - name: Build packages
-        uses: openwrt/gh-action-sdk@main
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
           FEEDNAME: twitchdropsminer
           PACKAGES: twitch-drops-miner luci-app-twitchdropsminer
           NO_REFRESH_CHECK: 1
           NO_SHFMT_CHECK: 1
-          MAKEFLAGS: -j$(nproc)
           V: s
+        run: |
+          # Mirrors what openwrt/gh-action-sdk does, minus the image build and
+          # minus the SDK re-download. See docs/openwrt/07-native-feasibility.md.
+          sudo chown -R 1000:1000 "$GITHUB_WORKSPACE"
+          docker run --rm \
+            --env BUILD --env BUILD_LOG --env EXTRA_FEEDS --env FEEDNAME \
+            --env IGNORE_ERRORS --env KEY_BUILD --env PRIVATE_KEY \
+            --env NO_DEFAULT_FEEDS --env NO_REFRESH_CHECK --env NO_SHFMT_CHECK \
+            --env PACKAGES --env INDEX --env V \
+            -v "$GITHUB_WORKSPACE:/artifacts" \
+            -v "$GITHUB_WORKSPACE:/feed" \
+            -v "$RUNNER_TEMP/gh-action-sdk/entrypoint.sh:/entrypoint.sh" \
+            -v "$RUNNER_TEMP/entrypoint-wrapper.sh:/entrypoint-wrapper.sh" \
+            --entrypoint /entrypoint-wrapper.sh \
+            "ghcr.io/openwrt/sdk:${ARCH}"
+          sudo chown -R --reference="$GITHUB_WORKSPACE/.." "$GITHUB_WORKSPACE"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
