@@ -23,11 +23,5 @@ settings.json
 # Local agent notes (CLAUDE.md is a symlink to AGENTS.md)
 /AGENTS.md
 /CLAUDE.md
-# AppImage
-/AppDir
-/appimage-builder
-/appimage-build
-/*.AppImage
-/*.AppImage.zsync
 .DS_Store
 *.app
