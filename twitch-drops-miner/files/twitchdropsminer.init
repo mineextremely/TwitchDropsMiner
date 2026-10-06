@@ -19,6 +19,8 @@ generate_settings() {
 	local priority_mode="$3"
 	local connection_quality="$4"
 	local available_drops_check="$5"
+	local language="$6"
+	local enable_badges_emotes="$7"
 
 	# shellcheck source=/dev/null
 	. /usr/share/libubox/jshn.sh
@@ -47,6 +49,11 @@ generate_settings() {
 	json_close_object
 	json_add_int connection_quality "$connection_quality"
 	json_add_boolean available_drops_check "$available_drops_check"
+	# The miner's own language, naming a lang/<name>.json shipped in the package.
+	# An unknown name is not fatal: main.py catches the ValueError and stays English.
+	json_add_string language "$language"
+	# Without this, badge/emote-only campaigns are never considered eligible.
+	json_add_boolean enable_badges_emotes "$enable_badges_emotes"
 	json_dump > "$path"
 }
 
@@ -61,6 +68,8 @@ start_service() {
 	config_get priority_mode main priority_mode 0
 	config_get_bool available_drops_check main available_drops_check 0
 	config_get proxy main proxy ""
+	config_get language main language "English"
+	config_get_bool enable_badges_emotes main enable_badges_emotes 0
 
 	case "$log_level" in
 		0) verbose="";;
@@ -72,7 +81,8 @@ start_service() {
 
 	mkdir -p "$data_dir"
 	generate_settings "$data_dir/settings.json" \
-		"$proxy" "$priority_mode" "$connection_quality" "$available_drops_check"
+		"$proxy" "$priority_mode" "$connection_quality" "$available_drops_check" \
+		"$language" "$enable_badges_emotes"
 	# keep the miner's log file in RAM - avoids flash wear, and makes it
 	# easily readable from LuCI
 	ln -sf /tmp/twitchdropsminer.log "$data_dir/log.txt"

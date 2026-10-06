@@ -45,5 +45,14 @@
 			"type": "view",
 			"path": "twitchdropsminer/config"
 		}
+	},
+
+	"admin/services/twitchdropsminer/help": {
+		"title": "Help",
+		"order": 5,
+		"action": {
+			"type": "view",
+			"path": "twitchdropsminer/help"
+		}
 	}
 }

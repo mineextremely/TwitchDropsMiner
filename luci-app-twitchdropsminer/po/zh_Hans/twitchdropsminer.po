@@ -310,3 +310,74 @@ msgstr "永不挖宝的游戏。"
 
 msgid "Game name"
 msgstr "游戏名称"
+
+# --- settings: language and advanced flags ---
+
+msgid "Language"
+msgstr "语言"
+
+msgid "Language used by the miner for its log and messages (requires a restart)."
+msgstr "挖矿器日志与消息所使用的语言（需要重启）。"
+
+msgid "Enable partial support for badges and emotes"
+msgstr "启用对挖掘徽章和表情的不完整支持"
+
+msgid "Campaigns that only offer badges and emotes are skipped unless this is enabled, and the miner may misbehave with it on."
+msgstr "仅提供徽章和表情的活动默认会被跳过；启用后它们也会被纳入挖掘，但可能导致运行异常。"
+
+msgid "About"
+msgstr "关于"
+
+msgid "Application created by:"
+msgstr "应用程序作者："
+
+msgid "Repository:"
+msgstr "仓库地址："
+
+msgid "Donate:"
+msgstr "捐赠："
+
+msgid "If you like the application and found it useful, please consider donating a small amount of money to support me. Thank you!"
+msgstr "如果您喜欢这个应用并觉得它有用，欢迎考虑捐赠一点钱来支持作者。谢谢！"
+
+msgid "Useful Links"
+msgstr "有用链接"
+
+msgid "See Twitch inventory"
+msgstr "查看Twitch库存"
+
+msgid "See all campaigns and manage account links"
+msgstr "查看所有掉宝活动并关联游戏账户"
+
+msgid "How It Works"
+msgstr "工作原理"
+
+msgid "Every several seconds, the application pretends to watch a particular stream by fetching stream metadata - this is enough to advance the drops. Note that this completely bypasses the need to download any actual stream of video and sound. To keep the status (ONLINE or OFFLINE) of the channels up-to-date, there's a websocket connection established that receives events about streams going up or down, or updates regarding the current number of viewers."
+msgstr "该应用程序每隔几秒钟就会抓取流媒体元数据，以假装在观看特定的直播频道——这足以推进掉宝进度，且完全不需要下载任何实际视频或声音流。为了使频道的状态（在线或离线）保持最新，建立了Websocket连接，以接收有关直播的开播下播事件，并更新当前观众数量。"
+
+msgid "Getting Started"
+msgstr "入门设置"
+
+msgid "1. Login to the application.\n2. Ensure your Twitch account is linked to all campaigns you're interested in mining.\n3. If you're interested in mining everything possible, change the Priority Mode to anything other than \"Priority list only\" and press on \"Reload\".\n4. If you want to mine specific games first, use the \"Priority\" list to set up an ordered list of games of your choice. Games from the top of the list will be attempted to be mined first, before the ones lower down the list.\n5. Keep the \"Priority mode\" selected as \"Priority list only\", to avoid mining games that are not on the priority list. Or not - it's up to you.\n6. Use the \"Exclude\" list to tell the application which games should never be mined.\n7. Changing the contents of either of the lists, or changing the \"Priority mode\", requires you to press on \"Reload\" for the changes to take an effect."
+msgstr "1. 在应用程序中登录您的Twitch账户。\n2. 确保您想领取掉宝的所有游戏的账户都已关联到您的Twitch账户。\n3. 若您想挖掘所有掉宝，请在“掉宝挖掘模式”中选择“仅观看优先列表中的游戏”以外的模式，然后点击“刷新”。\n4. 若您想优先挖掘特定游戏的掉宝，请在“优先列表”中按照挖掘优先级顺序排列游戏。程序将尝试先挖掘列表顶部的游戏，然后再挖掘后面的游戏。\n5. 勾选“仅观看优先列表中的游戏”时，不会挖掘不在“优先列表”中的游戏。\n6. 在“排除列表”中添加永不挖掘的游戏。\n7. 更改任一列表的内容，或更改“仅观看优先列表中的游戏”勾选状态后，需要手动点击“刷新”才能使改动生效。"
+
+msgid "%d of %d campaigns • %d/%d drops claimed"
+msgstr "%d/%d 个活动 • 已领取 %d/%d 个掉落"
+
+msgid "No campaigns match the current filter."
+msgstr "没有活动匹配当前筛选条件。"
+
+msgid "Filter"
+msgstr "筛选"
+
+msgid "Show:"
+msgstr "掉宝活动："
+
+msgid "Excluded"
+msgstr "不在优先挖掘列表的游戏"
+
+msgid "Finished"
+msgstr "已领取"
+
+msgid "Refresh"
+msgstr "刷新"

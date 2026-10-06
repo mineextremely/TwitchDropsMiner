@@ -3,11 +3,88 @@
 'require fs';
 'require poll';
 'require ui';
+'require uci';
 
 var INVENTORY_FILE = '/tmp/twitchdropsminer.inventory.json';
 
 /* see overview.js - covers both the footstrap and the bootstrap label classes */
 var LABEL_BAD = 'label danger important';
+
+/*
+ * Mirrors the desktop GUI's Inventory tab filter (gui.py InventoryOverview).
+ * `not_linked` has no fixed default: the desktop seeds it from the priority
+ * mode, so it is left null until the UCI settings have been loaded.
+ *
+ * Unlike the desktop, toggling a box re-filters immediately instead of waiting
+ * for the Refresh button - the desktop's checkbuttons have no command binding
+ * at all, which just makes them look broken.
+ */
+var filters = {
+	not_linked: null,
+	upcoming: true,
+	expired: false,
+	excluded: false,
+	finished: false
+};
+
+/* the three settings the visibility rule needs, read from UCI */
+var cfg = { exclude: [], priority: [], priority_only: true };
+
+function loadConfig() {
+	return uci.load('twitchdropsminer').then(function() {
+		cfg.exclude = uci.get('twitchdropsminer', 'main', 'exclude') || [];
+		cfg.priority = uci.get('twitchdropsminer', 'main', 'priority') || [];
+		/* 0 = PriorityMode.PRIORITY_ONLY */
+		cfg.priority_only = (uci.get('twitchdropsminer', 'main', 'priority_mode') || '0') == '0';
+
+		if (filters.not_linked === null)
+			filters.not_linked = cfg.priority_only;
+	}).catch(function() {
+		/* without UCI we can't tell which games are excluded or prioritised;
+		   fall back to the defaults rather than failing the whole page */
+		if (filters.not_linked === null)
+			filters.not_linked = true;
+	});
+}
+
+/*
+ * The desktop's InventoryOverview._update_visibility, clause for clause.
+ *
+ * The "sub-only" test deserves a note: the desktop uses
+ * `campaign.required_minutes > 0`, and DropsCampaign.required_minutes is
+ * `max(d.total_required_minutes for d in drops)`, where a drop's total also
+ * counts its precondition drops. Since preconditions are themselves drops of
+ * the same campaign, "some drop needs minutes" and "the campaign's maximum is
+ * positive" are the same statement - and the inventory export only carries the
+ * per-drop `required_minutes`, so this is exact, not an approximation.
+ */
+function isVisible(campaign) {
+	var drops = campaign.drops || [];
+	var game = campaign.game || '';
+
+	if (!drops.some(function(drop) { return (drop.required_minutes || 0) > 0; }))
+		return false;
+
+	if (!(filters.not_linked || campaign.eligible))
+		return false;
+
+	if (!(campaign.active ||
+		(filters.upcoming && campaign.upcoming) ||
+		(filters.expired && campaign.expired)))
+		return false;
+
+	/* (not excluded and not priority-only) or on the priority list -- and the
+	   whole clause is short-circuited when the "Excluded" box is ticked */
+	if (!(filters.excluded ||
+		((cfg.exclude.indexOf(game) < 0 && !cfg.priority_only) ||
+		 cfg.priority.indexOf(game) >= 0)))
+		return false;
+
+	if (!(filters.finished || !campaign.finished))
+		return false;
+
+	return true;
+}
 
 function readInventory() {
 	return fs.read(INVENTORY_FILE).then(function(data) {
@@ -185,48 +262,73 @@ function renderCampaign(campaign) {
 
 return view.extend({
 	load: function() {
-		return Promise.resolve();
+		return loadConfig();
 	},
 
 	render: function() {
+		var self = this;
 		var summaryEl = E('div', {}, _('Loading...'));
 		var listEl = E('div', {}, '');
+		var inventory = null;
+
+		function filterBox(key, label) {
+			var box = E('input', { 'type': 'checkbox' });
+
+			box.checked = !!filters[key];
+			box.addEventListener('change', function() {
+				filters[key] = box.checked;
+				renderList();
+			});
+
+			return E('label', { 'style': 'margin-right:1.25em; white-space:nowrap;' },
+				[ box, ' ', label ]);
+		}
+
+		function renderList() {
+			while (listEl.firstChild)
+				listEl.removeChild(listEl.firstChild);
+			while (summaryEl.firstChild)
+				summaryEl.removeChild(summaryEl.firstChild);
+
+			if (inventory == null) {
+				summaryEl.textContent =
+					_('No inventory available yet - the miner is not running.');
+				return;
+			}
+
+			var all = inventory.campaigns || [];
+			var shown = all.filter(isVisible);
+			var claimed = 0, total = 0;
+
+			shown.forEach(function(c) {
+				claimed += c.claimed_drops || 0;
+				total += c.total_drops || 0;
+			});
+
+			summaryEl.appendChild(E('p', {}, (shown.length === all.length
+				? _('%d campaigns • %d/%d drops claimed').format(shown.length, claimed, total)
+				: _('%d of %d campaigns • %d/%d drops claimed')
+					.format(shown.length, all.length, claimed, total))));
+
+			if (!all.length) {
+				listEl.appendChild(E('p', {}, _('No campaigns available.')));
+				return;
+			}
+			if (!shown.length) {
+				listEl.appendChild(E('p', {}, _('No campaigns match the current filter.')));
+				return;
+			}
+			/* NOTE: the miner exports the campaigns in display order
+			   (being mined first, then active, upcoming and the rest) */
+			shown.forEach(function(campaign) {
+				listEl.appendChild(renderCampaign(campaign));
+			});
+		}
 
 		function refresh() {
 			return readInventory().then(function(inv) {
-				var campaigns = (inv && inv.campaigns) || [];
-
-				if (!inv) {
-					summaryEl.textContent =
-						_('No inventory available yet - the miner is not running.');
-					while (listEl.firstChild)
-						listEl.removeChild(listEl.firstChild);
-					return;
-				}
-
-				var claimed = 0, total = 0;
-
-				campaigns.forEach(function(c) {
-					claimed += c.claimed_drops || 0;
-					total += c.total_drops || 0;
-				});
-
-				while (summaryEl.firstChild)
-					summaryEl.removeChild(summaryEl.firstChild);
-				summaryEl.appendChild(E('p', {},
-					_('%d campaigns • %d/%d drops claimed').format(campaigns.length, claimed, total)));
-
-				while (listEl.firstChild)
-					listEl.removeChild(listEl.firstChild);
-				if (!campaigns.length) {
-					listEl.appendChild(E('p', {}, _('No campaigns available.')));
-					return;
-				}
-				/* NOTE: the miner exports the campaigns in display order
-				   (being mined first, then active, upcoming and the rest) */
-				campaigns.forEach(function(campaign) {
-					listEl.appendChild(renderCampaign(campaign));
-				});
+				inventory = inv;
+				renderList();
 			});
 		}
 
@@ -235,6 +337,21 @@ return view.extend({
 
 		return E([], [
 			E('h2', {}, _('Twitch Drops Miner - Inventory')),
+			E('div', { 'class': 'cbi-section' }, [
+				E('h3', {}, _('Filter')),
+				E('div', { 'style': 'display:flex; flex-wrap:wrap; align-items:center;' }, [
+					E('span', { 'style': 'margin-right:0.75em;' }, _('Show:')),
+					filterBox('not_linked', _('Not linked')),
+					filterBox('upcoming', _('Upcoming')),
+					filterBox('expired', _('Expired')),
+					filterBox('excluded', _('Excluded')),
+					filterBox('finished', _('Finished')),
+					E('button', {
+						'class': 'cbi-button cbi-button-action',
+						'click': ui.createHandlerFn(self, refresh)
+					}, _('Refresh'))
+				])
+			]),
 			E('div', { 'class': 'cbi-section' }, [
 				E('div', { 'class': 'cbi-section-descr' }, [
 					_('All campaigns the miner knows about, with the progress of every drop. ' +
