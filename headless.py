@@ -11,16 +11,18 @@ written periodically as well, which is what the LuCI interface reads.
 """
 from __future__ import annotations
 
+import json
 import asyncio
 import logging
 from time import time
+from pathlib import Path
 from collections import abc
 from datetime import datetime
 from typing import Any, TypeVar, TYPE_CHECKING
 
 from translate import _
 from exceptions import ExitRequest, LoginException
-from constants import STATUS_PATH
+from constants import STATUS_PATH, INVENTORY_PATH
 from utils import json_save
 
 if TYPE_CHECKING:
@@ -34,6 +36,20 @@ logger = logging.getLogger("TwitchDrops")
 _T = TypeVar("_T")
 # how often the status file is refreshed, in seconds
 STATUS_INTERVAL = 2
+# the inventory is much larger than the status, so it's rewritten at most this often
+INVENTORY_INTERVAL = 10
+
+
+def _write_json(path: Path, contents: Any) -> None:
+    """
+    Writes a file as compact JSON, atomically.
+    """
+    # NOTE: json_save() is for the small, human-editable config files and
+    # pretty prints - that would nearly double the size of the full inventory
+    new_path = path.with_name(f"{path.name}.new")
+    with new_path.open('w', encoding="utf8") as file:
+        json.dump(contents, file, separators=(',', ':'))
+    new_path.replace(path)
 
 
 class _Tray:
@@ -135,17 +151,28 @@ class _Channels:
 
 
 class _Inventory:
-    """Inventory tab replacement."""
+    """Inventory tab replacement.
+
+    Keeps the campaign list the GUI would be displaying. Every change flags
+    the inventory file as stale, so it can be rewritten by the status writer.
+    """
+
+    def __init__(self, on_change: abc.Callable[[], None]):
+        self._on_change = on_change
+        self.campaigns: list[DropsCampaign] = []
 
     def clear(self) -> None:
-        pass
+        self.campaigns.clear()
+        self._on_change()
 
     def update_drop(self, drop: TimedDrop) -> None:
-        pass
+        # progress within a drop changed - the file needs a refresh
+        self._on_change()
 
     async def add_campaign(self, campaign: DropsCampaign) -> None:
         # NOTE: this is awaited by the core via asyncio.as_completed
-        pass
+        self.campaigns.append(campaign)
+        self._on_change()
 
 
 class _Button:
@@ -220,13 +247,17 @@ class HeadlessUI:
         self._twitch: Twitch = twitch
         self._close_requested = asyncio.Event()
         self._status_task: asyncio.Task[None] | None = None
+        # set when the campaign list (or a drop's progress) needs re-exporting
+        self._inventory_dirty: bool = True
+        # when the inventory file was written last, to throttle the rewrites
+        self._inventory_ts: float = 0.0
         # interface components
         self.tray = _Tray()
         self.status = _Status()
         self.websockets = _Websockets()
         self.progress = _Progress()
         self.channels = _Channels()
-        self.inv = _Inventory()
+        self.inv = _Inventory(self._inventory_changed)
         self.login = _Login()
         self.help = _Help()
 
@@ -301,12 +332,24 @@ class HeadlessUI:
 
     # status reporting
 
+    def _inventory_changed(self) -> None:
+        self._inventory_dirty = True
+
     async def _status_writer(self) -> None:
         while True:
             try:
                 json_save(STATUS_PATH, self._snapshot(), sort=True)
             except Exception:
                 logger.debug("Failed to write the status file", exc_info=True)
+            now = time()
+            if self._inventory_dirty and (now - self._inventory_ts) >= INVENTORY_INTERVAL:
+                try:
+                    _write_json(INVENTORY_PATH, self._inventory_snapshot())
+                    self._inventory_dirty = False
+                    self._inventory_ts = now
+                except Exception:
+                    # keep the flag set, so the write is retried on the next pass
+                    logger.debug("Failed to write the inventory file", exc_info=True)
             await asyncio.sleep(STATUS_INTERVAL)
 
     def _snapshot(self) -> dict[str, Any]:
@@ -383,3 +426,61 @@ class HeadlessUI:
             })
         channels.sort(key=lambda item: (not item["watching"], -(item["viewers"] or 0)))
         return channels
+
+    def _inventory_snapshot(self) -> dict[str, Any]:
+        watched = self.progress.drop
+        watched_campaign_id = watched.campaign.id if watched is not None else None
+        campaigns = [self._campaign_snapshot(c, watched_campaign_id) for c in self.inv.campaigns]
+        # campaign order: being mined first, then active, upcoming, and the rest
+        campaigns.sort(key=lambda c: (not c["watching"], c["finished"], c["upcoming"]))
+        return {
+            "ts": round(time(), 3),
+            "count": len(campaigns),
+            "campaigns": campaigns,
+        }
+
+    def _campaign_snapshot(
+        self, campaign: DropsCampaign, watched_campaign_id: str | None
+    ) -> dict[str, Any]:
+        game = getattr(campaign, "game", None)
+        # campaigns without time based drops (ex. subscription drops) have
+        # nothing to compute progress from
+        timed = bool(campaign.total_drops)
+        return {
+            "id": campaign.id,
+            "name": campaign.name,
+            "game": game.name if game is not None else None,
+            "image": campaign.image_url,
+            "eligible": campaign.eligible,
+            "active": campaign.active,
+            "upcoming": campaign.upcoming,
+            "expired": campaign.expired,
+            "finished": campaign.finished,
+            "ends_at": campaign.ends_at.isoformat(),
+            "progress": round(campaign.progress, 4) if timed else 0.0,
+            "claimed_drops": campaign.claimed_drops,
+            "total_drops": campaign.total_drops,
+            "remaining_minutes": campaign.remaining_minutes if timed else 0,
+            "allowed_channels": [channel.name for channel in campaign.allowed_channels],
+            "watching": campaign.id == watched_campaign_id,
+            "drops": [self._drop_inventory_entry(drop) for drop in campaign.drops],
+        }
+
+    def _drop_inventory_entry(self, drop: TimedDrop) -> dict[str, Any]:
+        return {
+            "name": drop.name,
+            "progress": round(drop.progress, 4),
+            "current_minutes": drop.current_minutes,
+            "required_minutes": drop.required_minutes,
+            "is_claimed": drop.is_claimed,
+            "can_claim": drop.can_claim,
+            "can_earn": drop.can_earn(),
+            "ends_at": drop.ends_at.isoformat(),
+            "benefits": [
+                {
+                    "name": benefit.name,
+                    "image": benefit.image_url,
+                }
+                for benefit in drop.benefits
+            ],
+        }

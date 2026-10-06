@@ -7,7 +7,8 @@
 				"/etc/init.d/twitchdropsminer": [ "exec" ],
 				"/usr/bin/tdm-import": [ "exec" ],
 				"/tmp/twitchdropsminer.log": [ "read" ],
-				"/tmp/twitchdropsminer.status.json": [ "read" ]
+				"/tmp/twitchdropsminer.status.json": [ "read" ],
+				"/tmp/twitchdropsminer.inventory.json": [ "read" ]
 			}
 		},
 		"write": {

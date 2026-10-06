@@ -7,6 +7,14 @@
 var STATUS_FILE = '/tmp/twitchdropsminer.status.json';
 var LOG_FILE = '/tmp/twitchdropsminer.log';
 
+/*
+ * Themes disagree on the negative label class: footstrap has .label.danger,
+ * the bootstrap family has .label.important instead. Both are applied - the
+ * class a theme doesn't know is ignored, and where both exist the theme's own
+ * definition wins (bootstrap's .danger is undefined, footstrap's is last).
+ */
+var LABEL_BAD = 'label danger important';
+
 function readStatus() {
 	return fs.read(STATUS_FILE).then(function(data) {
 		try {
@@ -20,6 +28,22 @@ function readStatus() {
 	});
 }
 
+function formatMinutes(minutes) {
+	if (minutes == null || minutes < 0)
+		return '-';
+
+	var hours = Math.floor(minutes / 60), mins = minutes % 60;
+
+	return hours > 0 ? '%dh %dm'.format(hours, mins) : '%dm'.format(mins);
+}
+
+function progressBar(fraction, text) {
+	var percent = Math.round((fraction || 0) * 100);
+
+	return E('div', { 'class': 'cbi-progressbar', 'title': text || '%d%%'.format(percent) },
+		E('div', { 'style': 'width:%d%%'.format(percent) }));
+}
+
 return view.extend({
 	load: function() {
 		return Promise.resolve();
@@ -29,7 +53,9 @@ return view.extend({
 		var self = this;
 		var statusEl = E('span', { 'class': 'label' }, _('Checking...'));
 		var infoEl = E('div', {}, '-');
-		var progressEl = E('div', {}, '-');
+		var campaignEl = E('div', {}, '-');
+		var dropEl = E('div', {}, '-');
+		var wsEl = E('div', {}, '-');
 		var channelsEl = E('div', {}, '-');
 		var logEl = E('pre', {
 			'style': 'max-height: 25em; overflow: auto; white-space: pre-wrap; margin: 0;'
@@ -40,10 +66,10 @@ return view.extend({
 				var running = (res.code === 0);
 
 				statusEl.textContent = running ? _('Running') : _('Stopped');
-				statusEl.className = 'label ' + (running ? 'success' : 'danger');
+				statusEl.className = running ? 'label success' : LABEL_BAD;
 			}).catch(function() {
 				statusEl.textContent = _('Stopped');
-				statusEl.className = 'label danger';
+				statusEl.className = LABEL_BAD;
 			});
 		}
 
@@ -78,8 +104,9 @@ return view.extend({
 				E('p', {}, [
 					_('Login:'), ' ',
 					auth.logged_in
-						? _('Logged in (user %d)').format(auth.user_id)
-						: _('Not logged in')
+						? E('span', { 'class': 'label success' },
+							_('Logged in (user %d)').format(auth.user_id))
+						: E('span', { 'class': LABEL_BAD }, _('Not logged in'))
 				])
 			];
 			if (auth.device_code)
@@ -92,30 +119,84 @@ return view.extend({
 			return children;
 		}
 
-		function renderProgress(st) {
-			var p = st && st.progress;
+		function renderCampaign(st) {
+			var progress = st && st.progress;
 
-			if (!p)
+			if (!progress)
 				return [ E('p', {}, _('Not mining at the moment.')) ];
 
-			var drop = p.drop, campaign = p.campaign, pct = Math.round((drop.progress || 0) * 100);
+			var campaign = progress.campaign;
+			var text = _('%d/%d drops claimed').format(
+				campaign.claimed_drops, campaign.total_drops
+			);
 
 			return [
 				E('p', {}, [ E('strong', {}, campaign.game || '?'), ' — ', campaign.name ]),
-				E('p', {}, [ _('Drop:'), ' ', drop.name || '-',
-					(drop.rewards && drop.rewards.length ? ' (' + drop.rewards.join(', ') + ')' : '') ]),
-				E('div', { 'class': 'cbi-progressbar', 'title': '%d%%'.format(pct) },
-					E('div', { 'style': 'width:%d%%'.format(pct) })),
+				progressBar(campaign.progress, '%d%%'.format(Math.round(campaign.progress * 100))),
+				E('p', {}, [
+					_('%d%% complete').format(Math.round(campaign.progress * 100)),
+					' • ', text
+				]),
+				E('p', {}, [ _('%s remaining').format(formatMinutes(campaign.remaining_minutes)) ])
+			];
+		}
+
+		function renderDrop(st) {
+			var progress = st && st.progress;
+
+			if (!progress)
+				return [ E('p', {}, _('Not mining at the moment.')) ];
+
+			var drop = progress.drop;
+			/* NOTE: `rewards` is already a comma separated string (rewards_text()) */
+			var children = [
+				E('p', {}, [
+					E('strong', {}, drop.name || '-'),
+					(drop.rewards ? ' — ' + drop.rewards : '')
+				]),
+				progressBar(drop.progress, '%d%%'.format(Math.round(drop.progress * 100))),
 				E('p', {}, [
 					'%d/%d'.format(drop.current_minutes, drop.required_minutes), ' ',
 					_('minutes watched'), ' • ',
-					_('%d min remaining').format(drop.remaining_minutes)
-				]),
-				E('p', {}, [
-					_('Campaign:'), ' ',
-					_('%d/%d drops claimed').format(campaign.claimed_drops, campaign.total_drops),
-					' • ', '%d%%'.format(Math.round((campaign.progress || 0) * 100))
+					_('%s remaining').format(formatMinutes(drop.remaining_minutes))
 				])
+			];
+
+			if (drop.is_claimed)
+				children.push(E('p', {}, E('span', { 'class': 'label success' },
+					_('Claimed') + ' ✓')));
+			else if (drop.can_claim)
+				children.push(E('p', {}, E('span', { 'class': 'label warning' },
+					_('Ready to claim'))));
+
+			return children;
+		}
+
+		function renderWebsockets(st) {
+			var sockets = (st && st.websockets) || [];
+
+			if (!sockets.length)
+				return [ E('p', {}, _('No websocket connections.')) ];
+
+			var topics = 0;
+
+			sockets.forEach(function(ws) { topics += ws.topics || 0; });
+
+			var list = sockets.map(function(ws) {
+				return E('tr', { 'class': 'tr' }, [
+					E('td', { 'class': 'td' }, _('Websocket #%d').format(ws.index + 1)),
+					E('td', { 'class': 'td' },
+						E('span', {
+							'class': (ws.status === 'Connected') ? 'label success' : LABEL_BAD
+						}, ws.status || _('Disconnected'))),
+					E('td', { 'class': 'td' }, String(ws.topics || 0))
+				]);
+			});
+
+			return [
+				E('p', {}, _('%d topics in total, %d channels being tracked')
+					.format(topics, Math.floor((topics - 2) / 2))),
+				E('table', { 'class': 'table' }, list)
 			];
 		}
 
@@ -162,7 +243,9 @@ return view.extend({
 					var st = res[1];
 
 					replace(infoEl, renderInfo(st));
-					replace(progressEl, renderProgress(st));
+					replace(campaignEl, renderCampaign(st));
+					replace(dropEl, renderDrop(st));
+					replace(wsEl, renderWebsockets(st));
 					replace(channelsEl, renderChannels(st));
 				});
 		}
@@ -194,8 +277,16 @@ return view.extend({
 				infoEl
 			]),
 			E('div', { 'class': 'cbi-section' }, [
-				E('h3', {}, _('Current drop')),
-				progressEl
+				E('h3', {}, _('Campaign progress')),
+				campaignEl
+			]),
+			E('div', { 'class': 'cbi-section' }, [
+				E('h3', {}, _('Drop progress')),
+				dropEl
+			]),
+			E('div', { 'class': 'cbi-section' }, [
+				E('h3', {}, _('Websockets')),
+				wsEl
 			]),
 			E('div', { 'class': 'cbi-section' }, [
 				E('h3', {}, _('Channels')),

@@ -110,6 +110,10 @@ LOG_PATH = Path(DATA_DIR, "log.txt")
 # Headless status file - written periodically by the headless UI and read by
 # the LuCI interface. NOTE: it lives in RAM by default, to avoid flash wear.
 STATUS_PATH = Path(os.environ.get("TDM_STATUS_FILE", "/tmp/twitchdropsminer.status.json"))
+# Headless inventory file - the campaign/drop list, refreshed whenever it changes
+INVENTORY_PATH = Path(
+    os.environ.get("TDM_INVENTORY_FILE", "/tmp/twitchdropsminer.inventory.json")
+)
 DUMP_PATH = Path(DATA_DIR, "dump.dat")
 LOCK_PATH = Path(DATA_DIR, "lock.file")
 CACHE_PATH = Path(DATA_DIR, "cache")
