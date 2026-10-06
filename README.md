@@ -20,6 +20,24 @@
 > Note: running on a router is explicitly *not* a supported use case of the upstream
 > project — that is exactly what this branch exists for.
 
+### Repository layout
+
+| Path | What it is |
+|---|---|
+| `*.py`, `lang/` | The application itself: upstream's sources plus this fork's headless mode (`headless.py`) and the small changes that let it run without a display |
+| `twitch-drops-miner/` | OpenWrt package for the headless service — Makefile, procd init, UCI config, vendored wheels |
+| `luci-app-twitchdropsminer/` | LuCI web UI package — views, menu, ACL, translations |
+| `docs/openwrt/` | Port documentation: analysis, packaging notes, feasibility write-ups |
+| `icons/`, `cache.py`, `gui.py`, `registry.py`, `manual.txt` | Desktop-only. Kept in the tree so the branch stays rebaseable onto upstream; not shipped |
+
+> ⚠️ **The packages do not build from the working tree.**
+> `twitch-drops-miner/Makefile` pins `PKG_SOURCE_VERSION` to a commit of this
+> repository, and OpenWrt archives *that commit's* whole tree. Editing a root `.py`
+> file therefore has **no effect** on the built packages until the pin is bumped *and*
+> `PKG_MIRROR_HASH` is regenerated to match — see
+> [the build notes](docs/openwrt/06-build.md). The LuCI package is different: its files
+> are taken straight from `luci-app-twitchdropsminer/`.
+
 This application allows you to AFK mine timed Twitch drops, without having to worry about switching channels when the one you were watching goes offline, claiming the drops, or even receiving the stream data itself. This helps you save on bandwidth and hassle.
 
 ### How It Works:
