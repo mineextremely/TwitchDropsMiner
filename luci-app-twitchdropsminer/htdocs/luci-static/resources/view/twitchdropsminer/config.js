@@ -31,6 +31,37 @@ return view.extend({
 		o.value('4', _('Debug (everything)'));
 		o.default = '2';
 
+		/*
+		 * The list mirrors the lang/<name>.json files shipped in the twitch-drops-miner
+		 * package, in the same order the desktop GUI offers them: English first, then
+		 * the rest sorted. An unknown value is not fatal - main.py catches the
+		 * ValueError from set_language() and falls back to English.
+		 */
+		o = s.option(form.ListValue, 'language', _('Language'),
+			_('Language used by the miner for its log and messages (requires a restart).'));
+		o.value('English', 'English');
+		o.value('Dansk', 'Dansk');
+		o.value('Deutsch', 'Deutsch');
+		o.value('Español', 'Español');
+		o.value('Français', 'Français');
+		o.value('Indonesian', 'Indonesian');
+		o.value('Italiano', 'Italiano');
+		o.value('Magyar', 'Magyar');
+		o.value('Nederlandse', 'Nederlandse');
+		o.value('Norsk', 'Norsk');
+		o.value('Polski', 'Polski');
+		o.value('Português', 'Português');
+		o.value('Română', 'Română');
+		o.value('Türkçe', 'Türkçe');
+		o.value('Čeština', 'Čeština');
+		o.value('Русский', 'Русский');
+		o.value('Українська', 'Українська');
+		o.value('العربية', 'العربية');
+		o.value('日本語', '日本語');
+		o.value('简体中文', '简体中文');
+		o.value('繁體中文', '繁體中文');
+		o.default = 'English';
+
 		o = s.option(form.Value, 'connection_quality', _('Connection quality'),
 			_('1 = best connection, 6 = worst. Affects request timeouts.'));
 		o.datatype = 'range(1,6)';
@@ -45,6 +76,16 @@ return view.extend({
 
 		o = s.option(form.Flag, 'available_drops_check', _('Available drops check'),
 			_('Check if drops can be earned on a channel before switching to it (slower).'));
+		o.default = '0';
+
+		/*
+		 * The desktop GUI files this one under "Advanced", behind a warning that the
+		 * options there can make the miner misbehave. Keep that warning in the
+		 * description, since the LuCI form has no separate advanced section.
+		 */
+		o = s.option(form.Flag, 'enable_badges_emotes',
+			_('Enable partial support for badges and emotes'),
+			_('Campaigns that only offer badges and emotes are skipped unless this is enabled, and the miner may misbehave with it on.'));
 		o.default = '0';
 
 		o = s.option(form.Value, 'proxy', _('Proxy'),
