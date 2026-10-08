@@ -70,6 +70,68 @@ jobs:
           # Pinned for reproducibility; bump deliberately.
           git -C "$RUNNER_TEMP/gh-action-sdk" checkout --quiet f5813d30eeef3534b58ac7e79c5d8842b6035434
 
+      # The SDK builds CPython, OpenSSL and their dependency closure from source,
+      # but most of that work exists only to *build itself* - it is never part of
+      # the uploaded artifacts. This script is injected inside the container after
+      # `feeds update -a` (feed Makefiles now exist) and before `make defconfig`
+      # (compile graph not built yet); see docs/openwrt/07-native-feasibility.md.
+      - name: Write the build-shrink patch script
+        run: |
+          cat > "$RUNNER_TEMP/shrink-feeds.sh" <<'SHRINK'
+          #!/bin/bash
+          # Only build-time packages that are never uploaded are touched:
+          #   - python3: the router runs the python3 from its own feeds, so drop
+          #     PGO (~9 min) and bluez (build-only dep of CPython's _bluetooth;
+          #     no python3-* package ships it).
+          #   - openssl: its optional engines depend on kernel kmods
+          #     (kmod-cryptodev -> a full kernel build). We never ship openssl,
+          #     so force the engines off and make their packaging tolerate the
+          #     resulting missing .so files.
+          set -e
+          PY=/builder/feeds/packages/lang/python/python3/Makefile
+          SSL=/builder/feeds/base_root/package/libs/openssl/Makefile
+          OM=/builder/include/openssl-module.mk
+          CFG=/builder/.config
+
+          if [ -f "$PY" ]; then
+            echo "[shrink] python3: drop PGO (--enable-optimizations)"
+            sed -i '/--enable-optimizations/d' "$PY"
+            echo "[shrink] python3: drop bluez from PKG_BUILD_DEPENDS"
+            sed -i -E 's/^(PKG_BUILD_DEPENDS):=bluez[[:space:]]+/\1:=/' "$PY"
+          fi
+
+          if [ -f "$SSL" ]; then
+            echo "[shrink] openssl: drop optional engine deps on kernel kmods"
+            # '-' must be in the character class (PACKAGE_libopenssl-devcrypto).
+            sed -i -E 's/\+[A-Za-z0-9_-]*:kmod-(cryptodev|crypto-user|crypto-hw-padlock)//g' "$SSL"
+            echo "[shrink] openssl: force the engines off (devcrypto needs crypto/cryptodev.h)"
+            sed -i 's/OPENSSL_OPTIONS:= shared no-tests/OPENSSL_OPTIONS:= shared no-tests no-devcryptoeng no-afalgeng no-padlockeng/' "$SSL"
+            sed -i 's/OPENSSL_OPTIONS += enable-devcryptoeng/OPENSSL_OPTIONS += no-devcryptoeng/g' "$SSL"
+            echo "[shrink] openssl: reindex feeds"
+            ./scripts/feeds update -i
+          fi
+
+          # Compiling a source package also packages all of its subpackages, so the
+          # engine packages still get an ipk even when unselected.
+          if [ -f "$OM" ]; then
+            echo "[shrink] openssl: tolerate missing engine .so when packaging"
+            sed -i -E '/INSTALL_BIN/s/^([[:space:]]*)/\1-/' "$OM"
+          fi
+
+          # The SDK image ships no .config, so append unconditionally; `make defconfig`
+          # honours explicit "is not set" lines even when CONFIG_ALL=y.
+          {
+            echo '# CONFIG_PACKAGE_libopenssl-devcrypto is not set'
+            echo '# CONFIG_PACKAGE_libopenssl-afalg is not set'
+            echo '# CONFIG_PACKAGE_libopenssl-padlock is not set'
+            echo '# CONFIG_OPENSSL_ENGINE_BUILTIN_DEVCRYPTO is not set'
+          } >> "$CFG"
+          echo "[shrink] done"
+          SHRINK
+          chmod +x "$RUNNER_TEMP/shrink-feeds.sh"
+          # the heredoc above is indented for readability; strip the leading spaces
+          sed -i 's/^          //' "$RUNNER_TEMP/shrink-feeds.sh"
+
       - name: Write the entrypoint wrapper
         run: |
           cat > "$RUNNER_TEMP/entrypoint-wrapper.sh" <<'WRAPPER'
@@ -94,7 +156,11 @@ jobs:
           else
             echo "no SDK in the image - letting setup.sh download it"
           fi
-          exec bash /entrypoint.sh
+          # Inject the shrink script between `./scripts/feeds update -a` and
+          # `make defconfig`. Write to /tmp: / is not writable for the build user.
+          sed 's#^make defconfig$#bash /shrink-feeds.sh\nmake defconfig#' \
+            /entrypoint.sh > /tmp/entrypoint-patched.sh
+          exec bash /tmp/entrypoint-patched.sh
           WRAPPER
           chmod +x "$RUNNER_TEMP/entrypoint-wrapper.sh"
           # the heredoc above is indented for readability; strip the leading spaces
@@ -104,7 +170,10 @@ jobs:
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
           FEEDNAME: twitchdropsminer
-          PACKAGES: twitch-drops-miner luci-app-twitchdropsminer
+          # luci-app-twitchdropsminer already depends on twitch-drops-miner
+          # (LUCI_DEPENDS), so a single compile pass produces both packages.
+          # Listing both would run the whole dependency closure twice.
+          PACKAGES: luci-app-twitchdropsminer
           NO_REFRESH_CHECK: 1
           NO_SHFMT_CHECK: 1
           V: s
@@ -121,6 +190,7 @@ jobs:
             -v "$GITHUB_WORKSPACE:/feed" \
             -v "$RUNNER_TEMP/gh-action-sdk/entrypoint.sh:/entrypoint.sh" \
             -v "$RUNNER_TEMP/entrypoint-wrapper.sh:/entrypoint-wrapper.sh" \
+            -v "$RUNNER_TEMP/shrink-feeds.sh:/shrink-feeds.sh" \
             --entrypoint /entrypoint-wrapper.sh \
             "ghcr.io/openwrt/sdk:${ARCH}"
           sudo chown -R --reference="$GITHUB_WORKSPACE/.." "$GITHUB_WORKSPACE"
