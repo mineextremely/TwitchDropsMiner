@@ -88,10 +88,15 @@ jobs:
           #     so force the engines off and make their packaging tolerate the
           #     resulting missing .so files.
           set -e
-          PY=/builder/feeds/packages/lang/python/python3/Makefile
-          SSL=/builder/feeds/base_root/package/libs/openssl/Makefile
+          # The feed layout differs between SDK lines: 25.12 clones the core feed
+          # as feeds/base_root/package/... (src-git --root=package), 24.10 as
+          # feeds/base/package/..., so discover the Makefiles instead of guessing.
+          PY=$(find /builder/feeds -type f -path '*/lang/python/python3/Makefile' 2>/dev/null | head -n1)
+          SSL=$(find /builder/feeds -type f -path '*/libs/openssl/Makefile' 2>/dev/null | head -n1)
           OM=/builder/include/openssl-module.mk
           CFG=/builder/.config
+          echo "[shrink] python3 Makefile: ${PY:-<not found>}"
+          echo "[shrink] openssl Makefile: ${SSL:-<not found>}"
 
           if [ -f "$PY" ]; then
             echo "[shrink] python3: drop PGO (--enable-optimizations)"
