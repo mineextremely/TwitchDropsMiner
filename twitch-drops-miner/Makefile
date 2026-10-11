@@ -13,13 +13,13 @@ PKG_SOURCE_DATE:=2026-10-04
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/mineextremely/TwitchDropsMiner.git
-PKG_SOURCE_VERSION:=d08384a81427cf77b8750db4737ff5498caf4273
+PKG_SOURCE_VERSION:=117e400980c69b833baa9dab1536eaabbefdb6de
 # sha256 of the tarball the build system generates from the above commit
 # NOTE: regenerate when bumping PKG_SOURCE_VERSION - run the package's
 # `download` step in an SDK container and hash dl/$(PKG_SOURCE):
 #   docker run --rm -v "$PWD:/feed" openwrt/sdk:aarch64_generic-25.12.3
 #   ... then sha256sum dl/twitch-drops-miner-16.0_pre.tar.zst
-PKG_MIRROR_HASH:=6a8be99b8f8ff78b42bef87729b35c42ca796110b96afe5b918032cdb6b7560e
+PKG_MIRROR_HASH:=8d09783e1c54792beb8bcb7f0fce6b17604cdfad28976ab94abd6563bbf2f68f
 
 PKG_MAINTAINER:=mineextremely
 PKG_LICENSE:=GPL-3.0-only
