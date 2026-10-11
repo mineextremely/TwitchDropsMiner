@@ -11,6 +11,25 @@ msgstr ""
 msgid "Twitch Drops Miner"
 msgstr "Twitch 掉宝挖矿器"
 
+# menu titles - the tab labels from menu.d/luci-app-twitchdropsminer.json.
+# "Overview" and "Settings" are also generic words in luci-base's zh-cn
+# catalog; they are repeated here (with the same wording) so this package's
+# own menu stays translated even where that catalog is not installed.
+msgid "Overview"
+msgstr "概览"
+
+msgid "Inventory"
+msgstr "库存"
+
+msgid "Login"
+msgstr "登录"
+
+msgid "Settings"
+msgstr "设置"
+
+msgid "Help"
+msgstr "帮助"
+
 # common
 msgid "Service status:"
 msgstr "服务状态："
