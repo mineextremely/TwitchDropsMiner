@@ -120,6 +120,14 @@ class _AuthState:
         self._twitch.gui.help._invalidate_button.config(state="disabled")
 
     async def _browser_login(self) -> str:
+        # NOTE: headless mode has no display and no zendriver - the saved
+        # session cookie is its only login method (see headless.py and
+        # docs/openwrt/03-auth-findings.md)
+        if getattr(self._twitch.gui, "headless", False):
+            raise LoginException(
+                "Browser login is not available in headless mode - "
+                "provide a valid cookies.jar instead"
+            )
         import zendriver
 
         gui_print = self._twitch.gui.print

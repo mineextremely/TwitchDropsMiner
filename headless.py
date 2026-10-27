@@ -192,9 +192,9 @@ class _Help:
 class _Login:
     """Login form replacement.
 
-    Headless login uses the OAuth device code flow: the code is printed to
-    stdout (and kept for status reporting), and the flow continues without
-    waiting for any user interaction in the app itself.
+    Headless login can only restore a saved session from `cookies.jar` - every
+    interactive flow (browser login, device code, password) needs user input
+    that isn't available here.
     """
 
     def __init__(self) -> None:
@@ -210,14 +210,16 @@ class _Login:
         pass
 
     async def ask_login(self) -> Any:
-        # NOTE: the password login flow is not reachable in headless mode
-        # without user input; the device code flow is used instead
+        # NOTE: no interactive flow is reachable in headless mode - a session
+        # cookie has to be provided instead
         raise LoginException(
             "Interactive login is not available in headless mode - "
-            "provide a valid cookies.jar, or use the device code flow"
+            "provide a valid cookies.jar instead"
         )
 
     async def ask_enter_code(self, page_url: Any, user_code: str) -> None:
+        # NOTE: kept for interface compatibility - the device code flow is no
+        # longer reachable (Twitch no longer serves it, see issue #1165)
         self.device_code = {
             "user_code": user_code,
             "verification_uri": str(page_url),
@@ -242,6 +244,9 @@ class HeadlessUI:
     A JSON snapshot of the current state is written to `STATUS_PATH`
     periodically, which is what the LuCI interface displays.
     """
+
+    # tells the core that there's no display to run the browser login in
+    headless = True
 
     def __init__(self, twitch: Twitch):
         self._twitch: Twitch = twitch
