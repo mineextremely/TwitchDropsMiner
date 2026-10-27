@@ -147,9 +147,11 @@ The python dependencies are vendored as musllinux wheels in
 dependency chain); regenerate them with `twitch-drops-miner/fetch-wheels.sh` when the
 target python version changes.
 
-> **When bumping `PKG_SOURCE_VERSION`** (the pinned app commit), update
-> `PKG_MIRROR_HASH` too, or the build fails with `Package HASH check failed`. The
-> correct value is printed by `make package/twitch-drops-miner/check V=s`.
+> **When bumping `PKG_SOURCE_VERSION`** (the pinned app commit): `PKG_MIRROR_HASH` is
+> `skip`, so there is no hash to regenerate — the tarball the build system generates
+> is not reproducible across environments (see the comment in the Makefile). The
+> pinned commit has to exist on GitHub before the build runs, because the source is
+> fetched from there.
 
 ## Keeping the fork in sync with upstream
 
@@ -162,8 +164,11 @@ git switch openwrt && git rebase master && git push --force-with-lease origin op
 ```
 
 After a rebase that touches the application sources (anything the package ships),
-bump `PKG_SOURCE_VERSION` and `PKG_MIRROR_HASH` in `twitch-drops-miner/Makefile`, or
-the package would keep shipping the old sources.
+bump `PKG_SOURCE_VERSION` in `twitch-drops-miner/Makefile` (`PKG_MIRROR_HASH` stays
+`skip`), or the package would keep shipping the old sources. The new commit has to be
+pushed to GitHub *before* `openwrt` is pushed, since the build fetches the tarball
+from there — pushing it to a throwaway branch (this repository uses `origin/pin`)
+first is the easiest way to make it reachable.
 
 ## Design notes
 

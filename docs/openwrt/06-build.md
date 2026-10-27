@@ -38,7 +38,12 @@ ls bin/packages/aarch64_generic/twitchdropsminer/
 
 ## 打包时踩过的坑（已修复，勿回退）
 
-1. **`PKG_MIRROR_HASH` 必须是真实哈希**（不能写 `skip`）：OpenWrt 会把 git checkout 打成确定性 tarball 并校验；写 `skip` 会在 check 阶段报 `Package HASH check failed`。
+1. **`PKG_MIRROR_HASH` 写 `skip`**（2026-10-11 起；以前那句「必须是真实哈希、不能写 skip」是错的）：
+   tarball 跨环境不可复现——`dl_github_archive.py`（API 路径）在 CI 里经常被限流，
+   回退到 `git clone` 打包后字节不同，而回退产物还取决于构建用户（`tar --owner=0` 只有 root 生效），
+   所以 24.10.8（root）与 25.12.5（buildbot）对同一提交算出不同哈希，任何具体值都只满足一个矩阵行。
+   构建系统接受 `skip`（`download` 照常返回 0），只有 `make package/<pkg>/check` 会打印
+   `PKG_MIRROR_HASH uses deprecated hash` 警告，CI 不跑 check。
 2. **apk 版本号格式有约束**：`16.dev`（上游 version.py 的值）不是合法 apk 版本（点号后必须跟数字），会报
    `ERROR: info field 'version' has invalid value`。已映射为 `16.0_pre`。合法后缀实测：`_pre`/`_git`/`_beta1`/`-rN`；非法：`_dev`、`~dev`。
 3. **vendored 轮子的 `libc.musl-aarch64.so.1` 依赖**：musllinux 轮子的 `.so` 带这个 soname，OpenWrt 的依赖扫描器不认识 → `Package twitch-drops-miner is missing dependencies`。
@@ -46,16 +51,11 @@ ls bin/packages/aarch64_generic/twitchdropsminer/
 
 ### ⚠️ 更新 PKG_SOURCE_VERSION 时必做
 
-`twitch-drops-miner` 使用 git 源，OpenWrt 会把 checkout 打成确定性 tarball 并校验
-`PKG_MIRROR_HASH`。升级固定提交后哈希会变，必须重新生成：
-
-```sh
-make package/twitch-drops-miner/check V=s   # 从 "set to <sha256>" 警告里取值
-```
-
-然后更新 `twitch-drops-miner/Makefile` 里的 `PKG_MIRROR_HASH`，否则构建会以
-`Package HASH check failed` 失败（实测 24.10.6 与 25.12.3 两个 SDK 产出的哈希一致，
-跨版本稳定）。
+`twitch-drops-miner` 使用 git 源，pinning 只改 `PKG_SOURCE_VERSION` 一项：
+`PKG_MIRROR_HASH` 恒为 `skip`（原因见上一节），不需要重新生成、也不该钉具体值。
+另外，pin 指向的提交**必须已经推到 GitHub**——源码是构建时从 GitHub 取的，
+本地未推送的提交在容器里根本取不到。做法是先推到占位分支（本项目用 `origin/pin`），
+再推 `openwrt`；等 `openwrt` 推上去，那个提交自然也在它的历史里。
 
 ## 三包一览
 
