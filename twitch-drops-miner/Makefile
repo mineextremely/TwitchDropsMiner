@@ -13,7 +13,7 @@ PKG_SOURCE_DATE:=2026-10-04
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/mineextremely/TwitchDropsMiner.git
-PKG_SOURCE_VERSION:=117e400980c69b833baa9dab1536eaabbefdb6de
+PKG_SOURCE_VERSION:=e94a4a948055d9f52e567e908a34f7b0bb91cabb
 # NOTE: the hash check is deliberately disabled - the tarball the build system
 # generates from the above commit is NOT reproducible across environments:
 #   - scripts/dl_github_archive.py (the normal path) needs api.github.com and
