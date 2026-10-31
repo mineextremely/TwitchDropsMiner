@@ -225,4 +225,6 @@ jobs:
           name: ${{ github.event.inputs.tag }}
           body: ${{ github.event.inputs.text }}
           prerelease: true
-          files: artifacts/**/*
+          files: |
+            artifacts/**/*.ipk
+            artifacts/**/*.apk
