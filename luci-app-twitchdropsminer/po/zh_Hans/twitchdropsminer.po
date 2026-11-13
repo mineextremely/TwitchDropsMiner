@@ -330,6 +330,10 @@ msgstr "永不挖宝的游戏。"
 msgid "Game name"
 msgstr "游戏名称"
 
+# shown instead of the picker while there is no inventory to pick from
+msgid "Games are listed once the miner has fetched its inventory - start it and reload this page, or enter a name."
+msgstr "挖矿器抓取到库存后才会列出游戏——请启动服务后刷新本页，也可以直接输入名称。"
+
 # --- settings: language and advanced flags ---
 
 msgid "Language"

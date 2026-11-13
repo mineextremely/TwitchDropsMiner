@@ -3,9 +3,55 @@
 'require form';
 'require fs';
 
+var INVENTORY_FILE = '/tmp/twitchdropsminer.inventory.json';
+
+/*
+ * The desktop GUI offers the games it knows about in the priority and exclude
+ * comboboxes (gui.py set_games()/update_priority_choices()), so LuCI offers the
+ * same names instead of demanding that they be typed. The list comes from the
+ * inventory snapshot the miner exports; the init script deletes it when the
+ * service stops, which is why an empty result is a normal, expected outcome:
+ * the DynamicList then falls back to the plain text input it used to be.
+ */
+function loadGameNames() {
+	return fs.read(INVENTORY_FILE).then(function(text) {
+		var data = null;
+
+		try {
+			data = JSON.parse(text);
+		}
+		catch (e) {
+			return [];
+		}
+
+		var names = [], seen = {};
+
+		((data && data.campaigns) || []).forEach(function(campaign) {
+			var name = campaign ? campaign.game : null;
+
+			if (name && !seen[name]) {
+				seen[name] = true;
+				names.push(name);
+			}
+		});
+
+		return names.sort();
+	}).catch(function() {
+		return [];
+	});
+}
+
 return view.extend({
-	render: function() {
+	load: function() {
+		return loadGameNames();
+	},
+
+	render: function(games) {
 		var m, s, o;
+
+		games = games || [];
+
+		var hint = _('Games are listed once the miner has fetched its inventory - start it and reload this page, or enter a name.');
 
 		m = new form.Map('twitchdropsminer', _('Twitch Drops Miner'),
 			_('Configuration of the Twitch Drops Miner service. ' +
@@ -93,12 +139,23 @@ return view.extend({
 		o.placeholder = 'http://host:port';
 		o.rmempty = true;
 
+		/*
+		 * value() doubles as the choice list for a DynamicList: as soon as it has
+		 * entries, ui.DynamicList renders a combobox instead of a text input, so the
+		 * games can be picked (and still typed, the combobox keeps a custom entry).
+		 */
 		o = s.option(form.DynamicList, 'priority', _('Priority list'),
-			_('Games to mine first, in order of importance.'));
+			_('Games to mine first, in order of importance.') + (games.length ? '' : ' ' + hint));
 		o.placeholder = _('Game name');
+		games.forEach(function(name) {
+			o.value(name, name);
+		});
 
 		o = s.option(form.DynamicList, 'exclude', _('Excluded games'),
-			_('Games to never mine.'));
+			_('Games to never mine.') + (games.length ? '' : ' ' + hint));
+		games.forEach(function(name) {
+			o.value(name, name);
+		});
 
 		return m.render();
 	},
